@@ -1,7 +1,10 @@
+
 import re
 from dataclasses import dataclass
-from src.loader import Page
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from src.loader import Page
 
 
 @dataclass

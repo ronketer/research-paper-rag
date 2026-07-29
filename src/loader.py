@@ -1,6 +1,7 @@
-import pymupdf  
 from dataclasses import dataclass
 from pathlib import Path
+
+import pymupdf
 
 
 @dataclass
