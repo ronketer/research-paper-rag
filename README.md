@@ -4,6 +4,34 @@ A **Retrieval-Augmented Generation (RAG)** system that lets you upload academic 
 
 Built as a portfolio project to demonstrate end-to-end RAG pipeline design, from PDF ingestion to a working local demo. An evaluation scaffold is included; benchmark results are still future work.
 
+## Table of Contents
+
+- [What It Does](#what-it-does)
+- [Architecture](#architecture)
+  - [Data Flow](#data-flow)
+  - [Module Architecture](#module-architecture)
+- [Core Technical Contribution: Section-Aware Chunking](#core-technical-contribution-section-aware-chunking)
+  - [The Problem](#the-problem)
+  - [The Solution](#the-solution)
+  - [Measurable Impact](#measurable-impact)
+- [Tech Stack](#tech-stack)
+- [Setup](#setup)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Local model with Ollama](#local-model-with-ollama)
+  - [Hosted model](#hosted-model)
+- [Evaluation](#evaluation)
+  - [Run the evaluation](#run-the-evaluation)
+  - [Evaluation Metrics](#evaluation-metrics)
+- [Running Tests](#running-tests)
+- [Project Structure](#project-structure)
+- [Design Decisions & Trade-offs](#design-decisions--trade-offs)
+  - [Why keyword routing instead of LLM routing?](#why-keyword-routing-instead-of-llm-routing)
+  - [Why local-first (Ollama + ChromaDB)?](#why-local-first-ollama--chromadb)
+  - [Why both chunking strategies?](#why-both-chunking-strategies)
+- [Future Work](#future-work)
+- [License](#license)
+
 ## What It Does
 
 1. **Upload** any academic PDF (lecture notes, papers, reports)
