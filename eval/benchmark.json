@@ -1,0 +1,269 @@
+[
+  {
+    "id": "dpr_factual_01",
+    "question": "How did the Dpr Karpukhin 2020 paper divide Wikipedia into retrieval units, and how many passages did this produce?",
+    "ground_truth": "The paper split each Wikipedia article into disjoint blocks of 100 words, prepended each block with its article title, and produced 21,015,324 passages.",
+    "type": "factual",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [4]}
+  },
+  {
+    "id": "dpr_factual_02",
+    "question": "What batch size and negative-passage setup were used to train the main DPR model in the Dpr Karpukhin 2020 paper?",
+    "ground_truth": "The main DPR model used in-batch negative training with a batch size of 128 and one additional BM25 negative passage for each question.",
+    "type": "factual",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [5]}
+  },
+  {
+    "id": "dpr_factual_03",
+    "question": "By how much did DPR outperform the Lucene-BM25 baseline in top-20 passage retrieval accuracy?",
+    "ground_truth": "DPR outperformed the strong Lucene-BM25 baseline by approximately 9 to 19 absolute percentage points in top-20 passage retrieval accuracy.",
+    "type": "factual",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [1]}
+  },
+  {
+    "id": "dpr_factual_04",
+    "question": "What retrieval throughput did DPR achieve with its FAISS in-memory index, and what BM25 throughput was reported for comparison?",
+    "ground_truth": "DPR processed 995.0 questions per second while returning the top 100 passages; BM25/Lucene processed 23.7 questions per second per CPU thread.",
+    "type": "factual",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [7]}
+  },
+  {
+    "id": "rag_factual_01",
+    "question": "What is the difference between RAG-Sequence and RAG-Token in the Rag Lewis 2020 paper?",
+    "ground_truth": "RAG-Sequence uses one retrieved document to condition every token in an output sequence, whereas RAG-Token can condition different output tokens on different retrieved documents.",
+    "type": "factual",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [3]}
+  },
+  {
+    "id": "rag_factual_02",
+    "question": "Which generator model does the Rag Lewis 2020 paper use, and how many parameters does it have?",
+    "ground_truth": "The paper uses BART-large, a pretrained sequence-to-sequence Transformer with approximately 400 million parameters, as its generator.",
+    "type": "factual",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [3]}
+  },
+  {
+    "id": "rag_factual_03",
+    "question": "What Wikipedia snapshot and document segmentation does the Rag Lewis 2020 paper use for non-parametric memory?",
+    "ground_truth": "It uses the December 2018 English Wikipedia dump, split into disjoint 100-word chunks for a total of about 21 million documents.",
+    "type": "factual",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [4]}
+  },
+  {
+    "id": "rag_factual_04",
+    "question": "How often did RAG retrieve gold-evidence articles on the FEVER task?",
+    "ground_truth": "The top retrieved document came from a gold-evidence article in 71 percent of cases, and a gold article appeared among the top 10 retrieved articles in 90 percent of cases.",
+    "type": "factual",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [7]}
+  },
+  {
+    "id": "realm_factual_01",
+    "question": "How did the Realm Guu 2020 paper segment Wikipedia, and approximately how many retrieval candidates resulted?",
+    "ground_truth": "REALM greedily split documents into chunks of up to 288 BERT wordpieces, producing just over 13 million retrieval candidates.",
+    "type": "factual",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [6]}
+  },
+  {
+    "id": "realm_factual_02",
+    "question": "How does REALM identify spans for salient span masking?",
+    "ground_truth": "REALM uses a BERT-based tagger trained on CoNLL-2003 to identify named entities and a regular expression to identify dates, then masks one such salient span in a sentence.",
+    "type": "factual",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [5]}
+  },
+  {
+    "id": "realm_factual_03",
+    "question": "How many retrieval candidates does REALM consider during fine-tuning inference?",
+    "ground_truth": "REALM considers the top five retrieved candidates during fine-tuning inference.",
+    "type": "factual",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [6]}
+  },
+  {
+    "id": "realm_factual_04",
+    "question": "Approximately how frequently is REALM's MIPS index refreshed during pretraining?",
+    "ground_truth": "A parallel process rebuilds the MIPS index approximately once every 500 training steps.",
+    "type": "factual",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [8]}
+  },
+  {
+    "id": "dpr_reasoning_01",
+    "question": "Why does DPR use a decomposable dot-product similarity function rather than a cross-attention scoring network?",
+    "ground_truth": "A decomposable score lets DPR compute all passage embeddings in advance and index them for efficient maximum-inner-product search. A cross-attention scorer would require jointly processing each question-passage pair and would prevent efficient retrieval over millions of passages.",
+    "type": "reasoning",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [3]}
+  },
+  {
+    "id": "dpr_reasoning_02",
+    "question": "Why are in-batch negatives computationally efficient for training DPR?",
+    "ground_truth": "With B questions and their positive passages in one batch, DPR computes a B-by-B similarity matrix. Each question can treat the other questions' positive passages as negatives, greatly increasing the number of training negatives without separately encoding more passages.",
+    "type": "reasoning",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [3, 4]}
+  },
+  {
+    "id": "dpr_reasoning_03",
+    "question": "Why is a BM25 passage that does not contain the answer useful as a hard negative for DPR?",
+    "ground_truth": "Such a passage shares many query terms and is therefore superficially plausible, but it lacks the answer. Distinguishing it from the positive passage forces the dense retriever to learn semantic relevance beyond lexical overlap.",
+    "type": "reasoning",
+    "source_papers": ["Dpr Karpukhin 2020"],
+    "source_pages": {"Dpr Karpukhin 2020": [3, 6]}
+  },
+  {
+    "id": "rag_reasoning_01",
+    "question": "Why does the Rag Lewis 2020 implementation keep the document encoder and index fixed while fine-tuning the query encoder and generator?",
+    "ground_truth": "Updating the document encoder would require periodically recomputing embeddings and rebuilding the very large document index. The authors found that this expensive step was unnecessary for strong performance, so they fine-tuned only the query encoder and BART generator.",
+    "type": "reasoning",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [4]}
+  },
+  {
+    "id": "rag_reasoning_02",
+    "question": "How does the different document marginalization used by RAG-Sequence and RAG-Token change what each model can retrieve while generating?",
+    "ground_truth": "RAG-Sequence marginalizes over one latent document for the complete output, encouraging a sequence to rely on a single source. RAG-Token marginalizes separately at each token, allowing different parts of the output to draw on different documents.",
+    "type": "reasoning",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [3, 4]}
+  },
+  {
+    "id": "rag_reasoning_03",
+    "question": "Why does the world-leader experiment support the claim that RAG's knowledge can be updated without retraining its parameters?",
+    "ground_truth": "The same model answered questions about different sets of world leaders correctly when supplied with matching 2016 or 2018 Wikipedia indexes, while accuracy collapsed with mismatched indexes. This shows that replacing non-parametric memory changes accessible facts without changing model parameters.",
+    "type": "reasoning",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [7, 8]}
+  },
+  {
+    "id": "realm_reasoning_01",
+    "question": "Why does REALM prefer salient span masking over ordinary random token masking?",
+    "ground_truth": "Many randomly masked tokens can be predicted from local context and do not require retrieval. Masking named entities and dates creates examples more likely to require external world knowledge, providing a stronger learning signal for the retriever.",
+    "type": "reasoning",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [5, 8]}
+  },
+  {
+    "id": "realm_reasoning_02",
+    "question": "Why does REALM rebuild its document index asynchronously during pretraining?",
+    "ground_truth": "Gradient updates continually change the document encoder and make cached document embeddings stale. Re-embedding and re-indexing in a background process lets training continue while periodically refreshing retrieval candidates, avoiding the cost of rebuilding the index after every update.",
+    "type": "reasoning",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [4, 5]}
+  },
+  {
+    "id": "realm_reasoning_03",
+    "question": "What problem does REALM's null document solve?",
+    "ground_truth": "Some masked tokens can be predicted without outside knowledge. The null document gives REALM an option representing no useful retrieval, preventing the model from being forced to condition on an irrelevant retrieved document.",
+    "type": "reasoning",
+    "source_papers": ["Realm Guu 2020"],
+    "source_pages": {"Realm Guu 2020": [5]}
+  },
+  {
+    "id": "comparison_01",
+    "question": "Compare the roles of the Dpr Karpukhin 2020 and Rag Lewis 2020 systems in producing a final answer.",
+    "ground_truth": "DPR is primarily a dense retriever: it selects passages for an extractive reader that predicts answer spans. RAG incorporates a DPR-style retriever into an encoder-decoder model and generates the answer token by token with BART while marginalizing over retrieved documents.",
+    "type": "comparison",
+    "source_papers": ["Dpr Karpukhin 2020", "Rag Lewis 2020"],
+    "source_pages": {
+      "Dpr Karpukhin 2020": [3, 7],
+      "Rag Lewis 2020": [3]
+    }
+  },
+  {
+    "id": "comparison_02",
+    "question": "Compare the Wikipedia passage collections used by Dpr Karpukhin 2020 and Rag Lewis 2020.",
+    "ground_truth": "Both systems use a December 2018 Wikipedia snapshot divided into disjoint 100-word passages. DPR reports 21,015,324 passages, while RAG describes the same scale as approximately 21 million documents and explicitly follows DPR's setup.",
+    "type": "comparison",
+    "source_papers": ["Dpr Karpukhin 2020", "Rag Lewis 2020"],
+    "source_pages": {
+      "Dpr Karpukhin 2020": [4],
+      "Rag Lewis 2020": [4]
+    }
+  },
+  {
+    "id": "comparison_03",
+    "question": "Compare how Dpr Karpukhin 2020 and Rag Lewis 2020 train or freeze their dense retrieval encoders.",
+    "ground_truth": "DPR trains both its question encoder and passage encoder using positive and negative passages. RAG initializes from DPR, freezes the document encoder and its index, and fine-tunes the query encoder together with the BART generator.",
+    "type": "comparison",
+    "source_papers": ["Dpr Karpukhin 2020", "Rag Lewis 2020"],
+    "source_pages": {
+      "Dpr Karpukhin 2020": [3, 5],
+      "Rag Lewis 2020": [3, 4]
+    }
+  },
+  {
+    "id": "comparison_04",
+    "question": "Compare the supervision used to train retrieval in Dpr Karpukhin 2020 and Realm Guu 2020.",
+    "ground_truth": "DPR learns from supervised question-passage pairs and explicit negative passages, including in-batch and BM25 negatives. REALM learns retrieval during unsupervised language-model pretraining by maximizing the likelihood of masked salient spans while treating retrieved documents as latent variables.",
+    "type": "comparison",
+    "source_papers": ["Dpr Karpukhin 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Dpr Karpukhin 2020": [3, 4],
+      "Realm Guu 2020": [2, 5]
+    }
+  },
+  {
+    "id": "comparison_05",
+    "question": "Compare how Dpr Karpukhin 2020 and Realm Guu 2020 maintain their dense retrieval indexes during training.",
+    "ground_truth": "DPR trains its encoders first and then encodes and indexes passages offline with FAISS for inference. REALM changes its document encoder during pretraining, so it asynchronously re-embeds the corpus and refreshes the MIPS index every several hundred steps.",
+    "type": "comparison",
+    "source_papers": ["Dpr Karpukhin 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Dpr Karpukhin 2020": [3],
+      "Realm Guu 2020": [4, 5]
+    }
+  },
+  {
+    "id": "comparison_06",
+    "question": "Compare where retrieval is used in the Dpr Karpukhin 2020 pipeline and the Realm Guu 2020 model lifecycle.",
+    "ground_truth": "DPR uses dense retrieval as the first stage of an open-domain QA pipeline before an answer reader. REALM integrates latent retrieval into language-model pretraining and continues using retrieval during downstream fine-tuning and inference.",
+    "type": "comparison",
+    "source_papers": ["Dpr Karpukhin 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Dpr Karpukhin 2020": [1, 3],
+      "Realm Guu 2020": [1, 2]
+    }
+  },
+  {
+    "id": "comparison_07",
+    "question": "Compare the stage at which retrieval learning occurs in Rag Lewis 2020 and Realm Guu 2020.",
+    "ground_truth": "RAG starts with a pretrained DPR retriever and BART generator, then fine-tunes the query encoder and generator on downstream knowledge-intensive tasks. REALM learns its retriever jointly with a masked language model during pretraining before fine-tuning the resulting model for open-domain QA.",
+    "type": "comparison",
+    "source_papers": ["Rag Lewis 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Rag Lewis 2020": [3, 4],
+      "Realm Guu 2020": [1, 2]
+    }
+  },
+  {
+    "id": "comparison_08",
+    "question": "Compare how Rag Lewis 2020 and Realm Guu 2020 handle changes to document-encoder embeddings during training.",
+    "ground_truth": "RAG avoids document-embedding changes by freezing the document encoder and index during fine-tuning. REALM trains the document encoder during pretraining and manages the resulting staleness by asynchronously rebuilding its MIPS index.",
+    "type": "comparison",
+    "source_papers": ["Rag Lewis 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Rag Lewis 2020": [4],
+      "Realm Guu 2020": [4, 5]
+    }
+  },
+  {
+    "id": "comparison_09",
+    "question": "Compare how Rag Lewis 2020 and Realm Guu 2020 formulate answer prediction for open-domain question answering.",
+    "ground_truth": "RAG uses an autoregressive BART generator to produce answer sequences while marginalizing over retrieved documents. REALM's open-QA fine-tuning predicts extractive answer spans within retrieved documents while marginalizing over the latent document.",
+    "type": "comparison",
+    "source_papers": ["Rag Lewis 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Rag Lewis 2020": [3],
+      "Realm Guu 2020": [4]
+    }
+  }
+]

@@ -2,7 +2,7 @@
 
 A **Retrieval-Augmented Generation (RAG)** system that lets you upload academic PDFs and ask questions in natural language — receiving cited answers with page numbers.
 
-Built as a portfolio project to demonstrate end-to-end RAG pipeline design, from PDF ingestion to evaluation with quantitative metrics.
+Built as a portfolio project to demonstrate end-to-end RAG pipeline design, from PDF ingestion to a working local demo. An evaluation scaffold is included; benchmark results are still future work.
 
 ## What It Does
 
@@ -123,7 +123,7 @@ It splits **at section boundaries first**, then subdivides only within a section
 
 ### Measurable Impact
 
-Both chunking strategies are implemented (`naive_chunk` vs `section_aware_chunk`) and evaluated against the same 30-question benchmark as comparable Langfuse experiment runs:
+Both chunking strategies are implemented (`naive_chunk` vs `section_aware_chunk`) and can be evaluated against the same benchmark. Results have not yet been run and committed:
 
 | Metric              | Naive Chunker | Section-Aware | Δ      |
 |---------------------|---------------|---------------|--------|
@@ -163,7 +163,7 @@ Both chunking strategies are implemented (`naive_chunk` vs `section_aware_chunk`
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/paper-qa-agent.git
+git clone https://github.com/ronketer/paper-qa-agent.git
 cd paper-qa-agent
 
 # 2. Install dependencies
@@ -228,7 +228,7 @@ Upload a PDF, click **Process and ingest**, then ask a question. Select one pape
 
 ## Evaluation
 
-The project includes a **30-question benchmark** covering three question types:
+The project includes a **30-question benchmark** covering three question types. The benchmark runner is available, but no result table is committed yet; treat the quantitative comparison as future work until it has been run with configured Langfuse credentials.
 
 | Type | Count | Example |
 |------|-------|---------|
@@ -296,11 +296,12 @@ paper-qa-agent/
 │   └── router.py               # Query classification (single-paper vs comparison)
 │
 ├── app.py                      # Gradio demo (upload, chat, source viewer)
+├── main.py                     # Compatibility entrypoint for app.py
 │
 ├── papers/                     # Sample PDFs for demo and evaluation
-│   ├── Interaction 1_ HCI summary.pdf
-│   ├── Interaction 1_ perception summary.pdf
-│   └── Interaction 1_ the basics of sensing.pdf
+│   ├── dpr_karpukhin_2020.pdf
+│   ├── rag_lewis_2020.pdf
+│   └── realm_guu_2020.pdf
 │
 ├── eval/                       # Evaluation framework
 │   ├── benchmark.json          # 30 curated Q&A pairs (factual/reasoning/comparison)
@@ -344,7 +345,11 @@ Building both `naive_chunk()` and `section_aware_chunk()` enables a controlled e
 
 ---
 
-## Future Enhancements
+## Future Work
+
+- [ ] Run the benchmark and commit measured results comparing naive and section-aware chunking.
+- [ ] Report retrieval precision/recall, faithfulness, answer relevance, and citation validity.
+- [ ] Add a short demo video or deploy a public demo.
 
 - [ ] **Agentic RAG** — wrap the retriever as a tool the LLM chooses to call (inspired by [HuggingFace Agents Course](https://huggingface.co/learn/agents-course/unit3/agentic-rag/introduction))
 - [ ] **Conversation memory** — allow follow-up questions across turns
