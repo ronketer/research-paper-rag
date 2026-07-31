@@ -148,7 +148,7 @@ Both chunking strategies are implemented (`naive_chunk` vs `section_aware_chunk`
 | **Query Routing** | Keyword matching | Deterministic, fast, free — saves LLM tokens for actual answers |
 | **UI** | Gradio Blocks | Simple Python demo with uploads, chat, sources, and temporary share links |
 | **Evaluation** | Langfuse datasets, experiments, and scores | Offline comparison plus trace-level diagnostics |
-| **Testing** | pytest + pytest-mock | 37 unit tests covering all modules |
+| **Testing** | pytest + pytest-mock | 49 tests covering loading, chunking, routing, retrieval, and chains |
 
 ---
 
@@ -271,14 +271,15 @@ Results, traces, evaluator reasoning, and run comparisons are stored in the Lang
 uv run pytest tests/ -v
 ```
 
-**37 tests** across 4 modules:
+**49 tests** across 5 modules:
 
 | Module | Tests | Approach |
 |--------|-------|----------|
 | `test_loader.py` | 9 | Integration tests against real PDFs from `papers/` |
-| `test_chunker.py` | 13 | Unit tests with synthetic text — section detection, boundary respect, metadata |
+| `test_chunker.py` | 18 | Unit tests with synthetic text — section detection, boundary respect, metadata |
 | `test_chains.py` | 4 | Mocked LLM + retriever — verifies output structure and citation format |
-| `test_vectorstore.py` | 5 | Mocked ChromaDB — verifies metadata, filtering, multi-paper k-distribution |
+| `test_router.py` | 12 | Unit tests for paper-name extraction and single-paper/comparison routing |
+| `test_vectorstore.py` | 6 | Mocked ChromaDB — verifies metadata, filtering, multi-paper k-distribution |
 
 ---
 
@@ -307,11 +308,12 @@ paper-qa-agent/
 │   ├── benchmark.json          # 30 curated Q&A pairs (factual/reasoning/comparison)
 │   └── evaluate.py             # Langfuse dataset/experiment runner
 │
-├── tests/                      # Test suite (37 tests)
+├── tests/                      # Test suite (49 tests)
 │   ├── conftest.py             # Shared fixtures (papers_dir, sample_pdf)
 │   ├── test_loader.py          # PDF loading tests
 │   ├── test_chunker.py         # Chunking logic + section detection tests
 │   ├── test_chains.py          # Chain output structure tests (mocked)
+│   ├── test_router.py          # Query classification tests
 │   └── test_vectorstore.py     # Vector store operation tests (mocked)
 │
 ├── pyproject.toml              # Dependencies and project config
