@@ -71,7 +71,7 @@ def retrieve(query: str, paper_filter: str | list[str] | None = None, k: int = 5
     """
     db = get_vectorstore()
 
-    if paper_filter is None:
+    if not paper_filter:
         return db.similarity_search(query, k=k)
 
     if isinstance(paper_filter, str):
