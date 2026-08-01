@@ -9,7 +9,7 @@ from typing import Any
 import gradio as gr
 
 from src.chains import answer_question, compare_papers
-from src.chunker import section_aware_chunk
+from src.chunker import naive_chunk, section_aware_chunk
 from src.loader import load_pdf
 from src.model_config import get_app_model_name
 from src.router import classify_query
@@ -18,6 +18,28 @@ from src.vectorstore import add_paper, delete_paper, list_papers
 
 # Gradio's Chatbot uses a list of dictionaries in this shape.
 ChatHistory = list[dict[str, Any]]
+
+NAIVE_CHUNKING = "Naive — benchmark winner"
+SECTION_AWARE_CHUNKING = "Section-aware — experimental"
+DEFAULT_CHUNKING_STRATEGY = NAIVE_CHUNKING
+CHUNKING_STRATEGIES = {
+    NAIVE_CHUNKING: naive_chunk,
+    SECTION_AWARE_CHUNKING: section_aware_chunk,
+}
+
+
+def runtime_status(chunking_strategy: str) -> str:
+    """Describe the model and ingestion strategy currently selected in the UI."""
+    model_name = get_app_model_name()
+    provider_name = (
+        model_name.split(":", maxsplit=1)[0].replace("-", " ").title()
+        if ":" in model_name
+        else "Custom"
+    )
+    return (
+        f"**Answer provider:** {provider_name} (configured in `.env`)  \n"
+        f"**Ingestion chunker:** {chunking_strategy}"
+    )
 
 
 def _paper_inventory(papers: list[str]) -> str:
@@ -47,7 +69,10 @@ def refresh_papers() -> tuple[gr.Dropdown, str]:
     return _dropdown_update(papers), _paper_inventory(papers)
 
 
-def ingest_pdf(file_path: str | None) -> tuple[str, gr.Dropdown, str]:
+def ingest_pdf(
+    file_path: str | None,
+    chunking_strategy: str = DEFAULT_CHUNKING_STRATEGY,
+) -> tuple[str, gr.Dropdown, str]:
     """Extract, chunk, and store one PDF selected in the Gradio uploader."""
     if not file_path:
         papers = list_papers()
@@ -59,15 +84,22 @@ def ingest_pdf(file_path: str | None) -> tuple[str, gr.Dropdown, str]:
         if not pages:
             raise ValueError("No text could be extracted from this PDF.")
 
+        chunker = CHUNKING_STRATEGIES.get(chunking_strategy)
+        if chunker is None:
+            raise ValueError(f"Unknown chunking strategy: {chunking_strategy}")
+
         title = pages[0].paper_title
-        chunks = section_aware_chunk(pages)
+        chunks = chunker(pages)
 
         # Replace an older copy instead of adding duplicate chunks.
         delete_paper(title)
         add_paper(title, chunks)
 
         papers = list_papers()
-        status = f"✅ Ingested **{title}** ({len(chunks)} chunks)."
+        status = (
+            f"✅ Ingested **{title}** using **{chunking_strategy}** "
+            f"({len(chunks)} chunks)."
+        )
         return status, _dropdown_update(papers, [title]), _paper_inventory(papers)
     except Exception as exc:
         papers = list_papers()
@@ -108,7 +140,11 @@ def _format_sources(
     for source in sources:
         paper = source.get("paper", "Unknown paper")
         page = source.get("page", "Unknown")
-        section = source.get("section", "Unknown section")
+        section = source.get("section")
+        section_text = str(section).strip() if section is not None else ""
+        source_label = f"{paper} — page {page}"
+        if section_text and section_text.casefold() != "unknown":
+            source_label += f" — {section_text}"
 
         # Prefix each source line with > so PDF text is displayed as a quote.
         quoted_text = "\n".join(
@@ -116,7 +152,7 @@ def _format_sources(
             for line in str(source.get("text", "")).splitlines()
         )
         sections.append(
-            f"**{paper} — page {page} — {section}**\n\n{quoted_text}"
+            f"**{source_label}**\n\n{quoted_text}"
         )
     return "\n\n---\n\n".join(sections)
 
@@ -208,7 +244,7 @@ with gr.Blocks(
 ) as demo:
     gr.Markdown(
         """
-        # 📚 Research Paper Q&A
+        # Research Paper Q&A
         Upload academic PDFs, ask cited questions, or select two papers to compare.
         """
     )
@@ -216,6 +252,16 @@ with gr.Blocks(
     with gr.Row():
         # Left column: paper management.
         with gr.Column(scale=1, min_width=300):
+            chunking_selector = gr.Radio(
+                choices=list(CHUNKING_STRATEGIES),
+                value=DEFAULT_CHUNKING_STRATEGY,
+                label="Chunking strategy",
+                info=(
+                    "Naive is the current benchmark winner. Section-aware is "
+                    "available as an experimental comparison."
+                ),
+            )
+            runtime_markdown = gr.Markdown(runtime_status(DEFAULT_CHUNKING_STRATEGY))
             pdf_file = gr.File(
                 label="Upload a PDF",
                 file_types=[".pdf"],
@@ -232,16 +278,20 @@ with gr.Blocks(
                 label="Papers for the next question",
                 info="Choose one for Q&A, two for comparison, or none for automatic routing.",
             )
-            delete_button = gr.Button("Delete selected papers", variant="stop")
+            delete_button = gr.Button("Delete selected from database", variant="stop")
             gr.Markdown("### Ingested papers")
             paper_list = gr.Markdown("_Loading papers..._")
 
         # Right column: question/answer conversation.
-        with gr.Column(scale=2, min_width=500):
+        with gr.Column(scale=3, min_width=500):
             chatbot = gr.Chatbot(
-                label="Conversation",
+                label="Q&A session",
                 height=480,
                 placeholder="Ingest a paper, then ask a question.",
+            )
+            gr.Markdown(
+                "_Questions are currently independent; earlier messages are "
+                "displayed but are not passed back to the model._"
             )
             with gr.Row():
                 question_box = gr.Textbox(
@@ -250,13 +300,22 @@ with gr.Blocks(
                     scale=5,
                 )
                 ask_button = gr.Button("Ask", variant="primary", scale=1)
-            clear_button = gr.ClearButton(
-                [question_box, chatbot],
-                value="Clear conversation",
+            gr.Examples(
+                examples=[
+                    ["Which generator model does the RAG paper use?"],
+                    ["Why are in-batch negatives efficient for training DPR?"],
+                    ["Compare the passage collections used by DPR and RAG."],
+                ],
+                inputs=question_box,
+                label="Example questions for the bundled papers",
             )
 
             with gr.Accordion("Retrieved sources", open=False):
                 sources_markdown = gr.Markdown("_Sources appear after an answer._")
+            clear_button = gr.ClearButton(
+                [question_box, chatbot, sources_markdown],
+                value="Clear Q&A session",
+            )
 
     # Wire Python functions to UI events. Each output position matches the
     # corresponding value returned by the handler function.
@@ -266,8 +325,13 @@ with gr.Blocks(
     )
     ingest_button.click(
         ingest_pdf,
-        inputs=pdf_file,
+        inputs=[pdf_file, chunking_selector],
         outputs=[ingestion_status, paper_selector, paper_list],
+    )
+    chunking_selector.change(
+        runtime_status,
+        inputs=chunking_selector,
+        outputs=runtime_markdown,
     )
     delete_button.click(
         remove_selected_papers,

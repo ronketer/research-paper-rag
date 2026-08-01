@@ -20,11 +20,6 @@ def get_app_model_name() -> str:
     return os.getenv("PAPER_QA_MODEL", DEFAULT_MODEL)
 
 
-def get_judge_model_name() -> str:
-    """Return the evaluation model, defaulting to the application model."""
-    return os.getenv("PAPER_QA_JUDGE_MODEL", get_app_model_name())
-
-
 def create_chat_model(
     model: str | None = None,
     *,

@@ -16,8 +16,8 @@ strategy and evaluated all 30 benchmark questions.
 |---|---:|---:|---:|
 | Source-page Hit@K | 0.700 | 0.633 | -0.067 |
 | Source-page Recall@K | 0.517 | 0.456 | -0.061 |
-| Source-page Precision@K | 0.219 | 0.193 | -0.026 |
-| Source-page F1@K | 0.298 | 0.260 | -0.038 |
+| Source-page Precision@K | 0.223 | 0.193 | -0.030 |
+| Source-page F1@K | 0.299 | 0.260 | -0.039 |
 | Source-paper Recall | 1.000 | 1.000 | +0.000 |
 | Citation Presence | 1.000 | 1.000 | +0.000 |
 | Citation Validity | 1.000 | 1.000 | +0.000 |
@@ -30,7 +30,7 @@ items. Higher is better.
 | Strategy | DPR chunks | RAG chunks | REALM chunks |
 |---|---:|---:|---:|
 | Naive | 73 | 93 | 65 |
-| Section-aware | 80 | 93 | 72 |
+| Section-aware | 75 | 93 | 72 |
 
 The run used four retrieved chunks for single-paper questions and three per paper
 for comparisons. Retrieval used the local
@@ -39,8 +39,10 @@ for comparisons. Retrieval used the local
 ## Interpretation
 
 Naive chunking performed better on every annotated source-page retrieval metric
-in this run. Its source-page F1 was 0.298 versus 0.260 for section-aware chunking,
-a difference of 0.038.
+in this run. Its source-page F1 was 0.299 versus 0.260 for section-aware chunking,
+a difference of 0.039. Filtering DPR's Markdown-like figure legend reduced its
+section-aware index from 80 to 75 chunks, but did not improve the aggregate
+section-aware retrieval scores in this benchmark.
 
 Source-paper recall was perfect for both strategies, so both reached the required
 papers even when page-level ranking differed. Citation presence and validity were

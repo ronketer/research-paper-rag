@@ -75,6 +75,30 @@ def test_detect_markdown_headings():
     assert "Methods" in titles
 
 
+def test_ignore_consecutive_markdown_like_figure_legend():
+    """DPR plot labels extracted with '#' should not become section names."""
+    text = (
+        "Top-k accuracy (%)\n"
+        "BM25\n"
+        "# Train: 1k\n"
+        "# Train: 10k\n"
+        "# Train: 20k\n"
+        "# Train: 40k\n"
+        "# Train: all (59k)\n"
+        "Figure 1: Retriever top-k accuracy."
+    )
+
+    assert detect_section_boundaries(text) == []
+
+
+def test_detect_markdown_title_subtitle_pair():
+    """The legend guard should not reject a normal Markdown title pair."""
+    text = "# Paper Title\n## Abstract\nAbstract content."
+    titles = [title for _, title in detect_section_boundaries(text)]
+
+    assert titles == ["Paper Title", "Abstract"]
+
+
 def test_detect_returns_line_indices():
     """Each boundary should be a (line_index, title) tuple with valid indices."""
     boundaries = detect_section_boundaries(SAMPLE_TEXT)

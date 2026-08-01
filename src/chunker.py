@@ -27,6 +27,26 @@ SECTION_PATTERNS = [
 ]
 
 
+def _is_markdown_heading_run(lines: list[str], line_index: int) -> bool:
+    """Return whether a line belongs to a table/figure-like run of headings.
+
+    PDF extraction can represent plot legends as several consecutive lines such
+    as ``# Train: 1k`` and ``# Train: all (59k)``. Requiring a run of at least
+    three keeps ordinary standalone Markdown headings (and title/subtitle pairs)
+    available as section boundaries.
+    """
+    markdown_heading = re.compile(r"^#{1,3}\s+.+")
+    start = line_index
+    while start > 0 and markdown_heading.match(lines[start - 1].strip()):
+        start -= 1
+
+    end = line_index
+    while end + 1 < len(lines) and markdown_heading.match(lines[end + 1].strip()):
+        end += 1
+
+    return end - start + 1 >= 3
+
+
 def detect_section_boundaries(text: str) -> list[tuple[int, str]]:
     """
     Find line positions where new sections begin.
@@ -42,6 +62,8 @@ def detect_section_boundaries(text: str) -> list[tuple[int, str]]:
             continue
         for pattern in SECTION_PATTERNS:
             if re.match(pattern, stripped):
+                if pattern == SECTION_PATTERNS[0] and _is_markdown_heading_run(lines, i):
+                    break
                 # Clean up markdown heading markers for the title
                 title = re.sub(r"^#+\s+", "", stripped)
                 boundaries.append((i, title))

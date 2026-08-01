@@ -1,7 +1,7 @@
 [project]
-name = "paper-qa-agent"
+name = "research-paper-rag"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local-first RAG system for cited Q&A and comparison across research papers"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

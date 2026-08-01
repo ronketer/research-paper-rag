@@ -1,4 +1,4 @@
-# Research Paper Q&A Agent 
+# Research Paper RAG
 
 A local-first **Retrieval-Augmented Generation (RAG)** system for asking questions
 across academic PDFs and receiving answers with page citations.
@@ -14,10 +14,10 @@ reproducible retrieval benchmark.
 - Single-paper QA and two-paper comparison with source-page metadata
 - Controlled comparison of naive and section-aware chunking over 30 questions
 - Deterministic evaluation requiring no API keys or LLM grading
-- 49 automated tests across loading, chunking, routing, retrieval, and chains
+- 56 automated tests across loading, chunking, routing, retrieval, chains, and UI handlers
 
-> **Benchmark finding:** the naive baseline achieved 0.298 source-page F1,
-> compared with 0.260 for the first section-aware implementation. The analysis
+> **Benchmark finding:** the naive baseline achieved 0.299 source-page F1,
+> compared with 0.260 for the current section-aware implementation. The analysis
 > below treats this counterintuitive result as an engineering finding and
 > identifies concrete improvements.
 
@@ -38,6 +38,7 @@ reproducible retrieval benchmark.
   - [Installation](#installation)
   - [Local model with Ollama](#local-model-with-ollama)
   - [Hosted model](#hosted-model)
+  - [Recording a portfolio demo](#recording-a-portfolio-demo)
 - [Evaluation](#evaluation)
   - [Run the evaluation](#run-the-evaluation)
   - [Evaluation Metrics](#evaluation-metrics)
@@ -53,9 +54,10 @@ reproducible retrieval benchmark.
 ## What It Does
 
 1. **Upload** any academic PDF (lecture notes, papers, reports)
-2. **Ask questions** in natural language — single-paper or cross-paper comparisons
-3. **Get cited answers** with `[p. X]` references to the exact source pages
-4. **Compare papers** side-by-side with auto-generated markdown tables
+2. **Choose a chunker** — naive (benchmark winner) or section-aware (experimental)
+3. **Ask questions** in natural language — single-paper or cross-paper comparisons
+4. **Get cited answers** with `[p. X]` references to the exact source pages
+5. **Inspect evidence** and compare papers side-by-side
 
 > _"Why are in-batch negatives efficient for training DPR?"_ → Answer with
 > supporting page citations
@@ -172,6 +174,10 @@ It splits at detected section boundaries first, then applies recursive
 size-based splitting inside long sections. Every chunk carries `paper_title`,
 `section`, `page_number`, and `chunk_index` metadata.
 
+The detector also rejects runs of three or more consecutive Markdown-like
+labels. This prevents figure legends such as DPR's `# Train: 1k` through
+`# Train: all (59k)` from being treated as document sections.
+
 ### Measurable Impact
 
 Both chunking strategies are evaluated against the same 30-question annotated
@@ -180,8 +186,8 @@ paper/page benchmark:
 | Metric | Naive Chunker | Section-Aware | Δ |
 |---|---:|---:|---:|
 | Source Page Recall@K | 0.517 | 0.456 | -0.061 |
-| Source Page Precision@K | 0.219 | 0.193 | -0.026 |
-| Source Page F1@K | 0.298 | 0.260 | -0.038 |
+| Source Page Precision@K | 0.223 | 0.193 | -0.030 |
+| Source Page F1@K | 0.299 | 0.260 | -0.039 |
 
 > In this benchmark run, naive chunking retrieved the annotated pages more
 > effectively. Reproduce it with
@@ -196,10 +202,11 @@ current three-paper benchmark.
 The current evidence suggests several contributing factors rather than one
 proven cause:
 
-- The heading regex produces false positives on reference entries and table-like
-  lines, including year-prefixed citations and training-set labels.
-- Section-aware splitting produced 245 chunks versus 231 for the baseline, and
-  35 chunks under 500 characters versus 14. Short fragments carry less context
+- Although consecutive Markdown-like legend labels are filtered, regex heading
+  detection can still produce false positives on unfamiliar table layouts and
+  reference entries, including year-prefixed citations.
+- Section-aware splitting produced 240 chunks versus 231 for the baseline, and
+  29 chunks under 500 characters versus 14. Short fragments carry less context
   and compete for the same fixed top-K retrieval slots.
 - Page-level scoring assigns each chunk one starting page. Relevant neighboring
   or cross-page evidence can therefore be missed by the metric.
@@ -225,7 +232,7 @@ clear basis for the next iteration.
 | **Query Routing** | Keyword matching | Deterministic, fast, free — saves LLM tokens for actual answers |
 | **UI** | Gradio Blocks | Simple Python demo with uploads, chat, sources, and temporary share links |
 | **Evaluation** | Local deterministic benchmark | Reproducible retrieval and citation metrics without API keys or LLM grading |
-| **Testing** | pytest + pytest-mock | 49 tests covering loading, chunking, routing, retrieval, and chains |
+| **Testing** | pytest + pytest-mock | 56 tests covering the pipeline and Gradio handlers |
 
 ---
 
@@ -240,8 +247,8 @@ clear basis for the next iteration.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/ronketer/paper-qa-agent.git
-cd paper-qa-agent
+git clone https://github.com/ronketer/research-paper-rag.git
+cd research-paper-rag
 
 # 2. Install dependencies
 uv sync
@@ -290,6 +297,11 @@ OPENAI_API_KEY=your-key
 
 The same application code also works with prefixes such as `anthropic:`, `google-genai:`, and `openrouter:` once the matching LangChain integration is installed. Provider credentials remain in `.env` using the provider's standard variable.
 
+The Gradio UI intentionally does not include a model picker. Model selection is
+deployment configuration: each user chooses a locally available or hosted model
+through `.env` before launching the app. The UI displays only the provider, so
+machine-specific Ollama aliases are not exposed in screenshots or recordings.
+
 Optional model settings:
 
 | Variable | Purpose |
@@ -297,7 +309,31 @@ Optional model settings:
 | `PAPER_QA_MODEL` | Application model in `provider:model` format |
 | `PAPER_QA_MODEL_BASE_URL` | Custom Ollama or OpenAI-compatible endpoint |
 
-Upload a PDF, click **Process and ingest**, then ask a question. Select one paper for Q&A, two for comparison, or no papers for automatic routing.
+Upload a PDF, choose a chunking strategy, click **Process and ingest**, then ask
+a question. Select one paper for Q&A, two for comparison, or no papers for
+automatic routing. Questions appear in one Q&A session, but conversational
+memory is not implemented yet; each question is answered independently.
+
+### Recording a portfolio demo
+
+Recording the demo is the one improvement best done manually because it requires
+choosing a clean interaction and checking that the local model's answers look
+presentable. The recording can use a hardware-optimized model from your private
+`.env`; viewers do not need that exact model to understand the workflow. A
+60–90 second GIF or video is sufficient:
+
+1. Start the app with `uv run python app.py`.
+2. Show that naive chunking is the measured default and section-aware is marked experimental.
+3. Ingest one bundled paper and ask one of the provided example questions.
+4. Select two bundled papers and run a comparison question.
+5. Expand **Retrieved sources** to show the page and section metadata.
+
+Save the recording as `docs/demo.gif` (or link a hosted video), then place it
+below the README introduction:
+
+```markdown
+![Research Paper Q&A demo](docs/demo.gif)
+```
 
 ---
 
@@ -334,8 +370,8 @@ The latest committed run produced:
 |---|---:|---:|---:|
 | Source-page Hit@K | 0.700 | 0.633 | -0.067 |
 | Source-page Recall@K | 0.517 | 0.456 | -0.061 |
-| Source-page Precision@K | 0.219 | 0.193 | -0.026 |
-| Source-page F1@K | 0.298 | 0.260 | -0.038 |
+| Source-page Precision@K | 0.223 | 0.193 | -0.030 |
+| Source-page F1@K | 0.299 | 0.260 | -0.039 |
 | Source-paper Recall | 1.000 | 1.000 | +0.000 |
 | Citation Presence | 1.000 | 1.000 | +0.000 |
 | Citation Validity | 1.000 | 1.000 | +0.000 |
@@ -372,22 +408,23 @@ page is counted as irrelevant when it is not part of the gold annotation.
 uv run pytest tests/ -v
 ```
 
-**49 tests** across 5 modules:
+**56 tests** across 6 modules:
 
 | Module | Tests | Approach |
 |--------|-------|----------|
 | `test_loader.py` | 9 | Integration tests against real PDFs from `papers/` |
-| `test_chunker.py` | 18 | Unit tests with synthetic text — section detection, boundary respect, metadata |
+| `test_chunker.py` | 20 | Unit tests with synthetic text — section detection, boundary respect, metadata |
 | `test_chains.py` | 4 | Mocked LLM + retriever — verifies output structure and citation format |
 | `test_router.py` | 12 | Unit tests for paper-name extraction and single-paper/comparison routing |
 | `test_vectorstore.py` | 6 | Mocked ChromaDB — verifies metadata, filtering, multi-paper k-distribution |
+| `test_app.py` | 4 | Mocked Gradio handlers — verifies strategy selection, ingestion, Q&A, and comparison |
 
 ---
 
 ## Project Structure
 
 ```
-paper-qa-agent/
+research-paper-rag/
 │
 ├── src/                        # Core pipeline logic
 │   ├── loader.py               # PDF → structured pages (PyMuPDF)
@@ -410,13 +447,14 @@ paper-qa-agent/
 │   ├── evaluate.py             # Local deterministic benchmark runner
 │   └── results.md              # Latest measured chunker comparison
 │
-├── tests/                      # Test suite (49 tests)
+├── tests/                      # Test suite (56 tests)
 │   ├── conftest.py             # Shared fixtures (papers_dir, sample_pdf)
 │   ├── test_loader.py          # PDF loading tests
 │   ├── test_chunker.py         # Chunking logic + section detection tests
 │   ├── test_chains.py          # Chain output structure tests (mocked)
 │   ├── test_router.py          # Query classification tests
-│   └── test_vectorstore.py     # Vector store operation tests (mocked)
+│   ├── test_vectorstore.py     # Vector store operation tests (mocked)
+│   └── test_app.py             # Gradio handler tests (mocked)
 │
 ├── pyproject.toml              # Dependencies and project config
 └── README.md
@@ -460,7 +498,7 @@ demonstrates why retrieval changes should be measured instead of assumed to help
 - [ ] Compare strategies at a fixed retrieved-token budget in addition to fixed top-K.
 - [ ] Store page spans rather than only each chunk's starting page.
 - [ ] Expand the benchmark beyond three papers and report per-question error analysis.
-- [ ] Add a short demo video or deploy a public demo.
+- [ ] Record the short portfolio demo described above and embed it near the README introduction.
 - [ ] **Agentic RAG** — wrap the retriever as a tool the LLM chooses to call (inspired by [HuggingFace Agents Course](https://huggingface.co/learn/agents-course/unit3/agentic-rag/introduction))
 - [ ] **Conversation memory** — allow follow-up questions across turns
 - [ ] **Hybrid search** — combine BM25 (keyword) with embedding-based retrieval
