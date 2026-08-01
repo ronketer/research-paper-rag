@@ -38,7 +38,6 @@ reproducible retrieval benchmark.
   - [Installation](#installation)
   - [Local model with Ollama](#local-model-with-ollama)
   - [Hosted model](#hosted-model)
-  - [Recording a portfolio demo](#recording-a-portfolio-demo)
 - [Evaluation](#evaluation)
   - [Run the evaluation](#run-the-evaluation)
   - [Evaluation Metrics](#evaluation-metrics)
@@ -48,7 +47,6 @@ reproducible retrieval benchmark.
   - [Why keyword routing instead of LLM routing?](#why-keyword-routing-instead-of-llm-routing)
   - [Why local-first (Ollama + ChromaDB)?](#why-local-first-ollama--chromadb)
   - [Why both chunking strategies?](#why-both-chunking-strategies)
-- [Future Work](#future-work)
 - [License](#license)
 
 ## What It Does
@@ -314,27 +312,6 @@ a question. Select one paper for Q&A, two for comparison, or no papers for
 automatic routing. Questions appear in one Q&A session, but conversational
 memory is not implemented yet; each question is answered independently.
 
-### Recording a portfolio demo
-
-Recording the demo is the one improvement best done manually because it requires
-choosing a clean interaction and checking that the local model's answers look
-presentable. The recording can use a hardware-optimized model from your private
-`.env`; viewers do not need that exact model to understand the workflow. A
-60–90 second GIF or video is sufficient:
-
-1. Start the app with `uv run python app.py`.
-2. Show that naive chunking is the measured default and section-aware is marked experimental.
-3. Ingest one bundled paper and ask one of the provided example questions.
-4. Select two bundled papers and run a comparison question.
-5. Expand **Retrieved sources** to show the page and section metadata.
-
-Save the recording as `docs/demo.gif` (or link a hosted video), then place it
-below the README introduction:
-
-```markdown
-![Research Paper Q&A demo](docs/demo.gif)
-```
-
 ---
 
 ## Evaluation
@@ -487,22 +464,6 @@ Building both `naive_chunk()` and `section_aware_chunk()` enables a controlled
 experiment: same PDFs, questions, embedding model, router, retrieval limits, and
 metrics—only the chunker changes. The baseline winning is itself useful: it
 demonstrates why retrieval changes should be measured instead of assumed to help.
-
----
-
-## Future Work
-
-- [x] Run the benchmark and commit deterministic retrieval/citation results comparing both chunkers.
-- [ ] Tighten heading detection to reject references, table rows, and other false positives.
-- [ ] Add a minimum chunk length and merge undersized adjacent section fragments.
-- [ ] Compare strategies at a fixed retrieved-token budget in addition to fixed top-K.
-- [ ] Store page spans rather than only each chunk's starting page.
-- [ ] Expand the benchmark beyond three papers and report per-question error analysis.
-- [ ] Record the short portfolio demo described above and embed it near the README introduction.
-- [ ] **Agentic RAG** — wrap the retriever as a tool the LLM chooses to call (inspired by [HuggingFace Agents Course](https://huggingface.co/learn/agents-course/unit3/agentic-rag/introduction))
-- [ ] **Conversation memory** — allow follow-up questions across turns
-- [ ] **Hybrid search** — combine BM25 (keyword) with embedding-based retrieval
-- [ ] **Multi-paper comparison (3+)** — extend beyond two-paper comparisons
 
 ---
 

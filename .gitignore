@@ -10,3 +10,4 @@ wheels/
 chroma_db/
 .env
 .DS_Store
+*.local.md
