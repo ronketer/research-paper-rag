@@ -56,14 +56,6 @@
     "source_pages": {"Rag Lewis 2020": [4]}
   },
   {
-    "id": "rag_factual_04",
-    "question": "How often did RAG retrieve gold-evidence articles on the FEVER task?",
-    "ground_truth": "The top retrieved document came from a gold-evidence article in 71 percent of cases, and a gold article appeared among the top 10 retrieved articles in 90 percent of cases.",
-    "type": "factual",
-    "source_papers": ["Rag Lewis 2020"],
-    "source_pages": {"Rag Lewis 2020": [7]}
-  },
-  {
     "id": "realm_factual_01",
     "question": "How did the Realm Guu 2020 paper segment Wikipedia, and approximately how many retrieval candidates resulted?",
     "ground_truth": "REALM greedily split documents into chunks of up to 288 BERT wordpieces, producing just over 13 million retrieval candidates.",
@@ -78,14 +70,6 @@
     "type": "factual",
     "source_papers": ["Realm Guu 2020"],
     "source_pages": {"Realm Guu 2020": [5]}
-  },
-  {
-    "id": "realm_factual_03",
-    "question": "How many retrieval candidates does REALM consider during fine-tuning inference?",
-    "ground_truth": "REALM considers the top five retrieved candidates during fine-tuning inference.",
-    "type": "factual",
-    "source_papers": ["Realm Guu 2020"],
-    "source_pages": {"Realm Guu 2020": [6]}
   },
   {
     "id": "realm_factual_04",
@@ -142,6 +126,14 @@
     "type": "reasoning",
     "source_papers": ["Rag Lewis 2020"],
     "source_pages": {"Rag Lewis 2020": [7, 8]}
+  },
+  {
+    "id": "rag_reasoning_04",
+    "question": "What do RAG's FEVER retrieval results imply about the quality of its evidence retrieval?",
+    "ground_truth": "RAG retrieved a document from a gold-evidence article first in 71 percent of cases, and retrieved a gold article within the top 10 in 90 percent of cases. This indicates that retrieval often found supporting evidence, although it was not perfect.",
+    "type": "reasoning",
+    "source_papers": ["Rag Lewis 2020"],
+    "source_pages": {"Rag Lewis 2020": [7]}
   },
   {
     "id": "realm_reasoning_01",
@@ -264,6 +256,17 @@
     "source_pages": {
       "Rag Lewis 2020": [3],
       "Realm Guu 2020": [4]
+    }
+  },
+  {
+    "id": "comparison_10",
+    "question": "Compare the retrieval-unit granularity and corpus scale used by Rag Lewis 2020 and Realm Guu 2020.",
+    "ground_truth": "RAG uses disjoint 100-word Wikipedia chunks and describes a collection of approximately 21 million documents. REALM uses chunks of up to 288 BERT wordpieces and produces just over 13 million retrieval candidates. Thus, REALM uses larger retrieval units and a smaller candidate collection in the reported setup.",
+    "type": "comparison",
+    "source_papers": ["Rag Lewis 2020", "Realm Guu 2020"],
+    "source_pages": {
+      "Rag Lewis 2020": [4],
+      "Realm Guu 2020": [6]
     }
   }
 ]

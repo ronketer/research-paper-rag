@@ -1,8 +1,25 @@
 # Research Paper Q&A Agent 
 
-A **Retrieval-Augmented Generation (RAG)** system that lets you upload academic PDFs and ask questions in natural language — receiving cited answers with page numbers.
+A local-first **Retrieval-Augmented Generation (RAG)** system for asking questions
+across academic PDFs and receiving answers with page citations.
 
-Built as a portfolio project to demonstrate end-to-end RAG pipeline design, from PDF ingestion to a working local demo. An evaluation scaffold is included; benchmark results are still future work.
+Built as a portfolio project to demonstrate an end-to-end RAG pipeline: PDF
+ingestion, two chunking strategies, local embeddings, vector retrieval,
+single- and multi-paper QA, deterministic routing, cited answers, and a
+reproducible retrieval benchmark.
+
+### Engineering highlights
+
+- End-to-end local pipeline using PyMuPDF, ChromaDB, LangChain, and Gradio
+- Single-paper QA and two-paper comparison with source-page metadata
+- Controlled comparison of naive and section-aware chunking over 30 questions
+- Deterministic evaluation requiring no API keys or LLM grading
+- 49 automated tests across loading, chunking, routing, retrieval, and chains
+
+> **Benchmark finding:** the naive baseline achieved 0.298 source-page F1,
+> compared with 0.260 for the first section-aware implementation. The analysis
+> below treats this counterintuitive result as an engineering finding and
+> identifies concrete improvements.
 
 ## Table of Contents
 
@@ -10,10 +27,11 @@ Built as a portfolio project to demonstrate end-to-end RAG pipeline design, from
 - [Architecture](#architecture)
   - [Data Flow](#data-flow)
   - [Module Architecture](#module-architecture)
-- [Core Technical Contribution: Section-Aware Chunking](#core-technical-contribution-section-aware-chunking)
+- [Controlled Chunking Experiment](#controlled-chunking-experiment)
   - [The Problem](#the-problem)
   - [The Solution](#the-solution)
   - [Measurable Impact](#measurable-impact)
+  - [What likely affected the result](#what-likely-affected-the-result)
 - [Tech Stack](#tech-stack)
 - [Setup](#setup)
   - [Prerequisites](#prerequisites)
@@ -39,9 +57,11 @@ Built as a portfolio project to demonstrate end-to-end RAG pipeline design, from
 3. **Get cited answers** with `[p. X]` references to the exact source pages
 4. **Compare papers** side-by-side with auto-generated markdown tables
 
-> _"What is the McGurk Effect?"_ → Answer citing `[p. 3]` from the perception paper
+> _"Why are in-batch negatives efficient for training DPR?"_ → Answer with
+> supporting page citations
 >
-> _"Compare digital vs analog electronics"_ → Structured comparison table with citations from both papers
+> _"Compare the passage collections used by DPR and RAG."_ → Structured
+> comparison table with citations from both papers
 
 ---
 
@@ -128,16 +148,17 @@ Dependencies flow **downward** (UI → Logic → Data) or **sideways** (chains �
 
 ---
 
-## Core Technical Contribution: Section-Aware Chunking
+## Controlled Chunking Experiment
 
-The key differentiator of this project is **section-aware text splitting** for academic documents.
+The project tests a concrete hypothesis: **does respecting academic section
+boundaries improve retrieval over a standard recursive character splitter?**
+Both strategies are implemented and evaluated under the same retrieval pipeline.
 
 ### The Problem
 
-Standard RAG tutorials use `RecursiveCharacterTextSplitter`, which splits text at arbitrary character boundaries. For academic papers, this creates chunks that:
-- Mix content from different sections (e.g., half "Methods" + half "Results")
-- Split equations, tables, and figures mid-way
-- Lose structural context that helps the LLM reason about the content
+A size-based splitter can combine text from adjacent sections and discard useful
+document structure. Academic headings therefore appear to offer a natural signal
+for creating more coherent chunks.
 
 ### The Solution
 
@@ -147,19 +168,47 @@ Standard RAG tutorials use `RecursiveCharacterTextSplitter`, which splits text a
 - LaTeX sections (`\section{Introduction}`)
 - Named sections (`Abstract`, `Conclusion`, `References`)
 
-It splits **at section boundaries first**, then subdivides only within a section if it exceeds the size limit. Every chunk carries metadata: `paper_title`, `section`, `page_number`, `chunk_index`.
+It splits at detected section boundaries first, then applies recursive
+size-based splitting inside long sections. Every chunk carries `paper_title`,
+`section`, `page_number`, and `chunk_index` metadata.
 
 ### Measurable Impact
 
-Both chunking strategies are implemented (`naive_chunk` vs `section_aware_chunk`) and can be evaluated against the same benchmark. Results have not yet been run and committed:
+Both chunking strategies are evaluated against the same 30-question annotated
+paper/page benchmark:
 
-| Metric              | Naive Chunker | Section-Aware | Δ      |
-|---------------------|---------------|---------------|--------|
-| Context Precision   | _pending_     | _pending_     | —      |
-| Answer Faithfulness | _pending_     | _pending_     | —      |
-| Answer Relevancy    | _pending_     | _pending_     | —      |
+| Metric | Naive Chunker | Section-Aware | Δ |
+|---|---:|---:|---:|
+| Source Page Recall@K | 0.517 | 0.456 | -0.061 |
+| Source Page Precision@K | 0.219 | 0.193 | -0.026 |
+| Source Page F1@K | 0.298 | 0.260 | -0.038 |
 
-> Run `uv run python eval/evaluate.py --ingest --chunker both`, then compare the two dataset runs in Langfuse.
+> In this benchmark run, naive chunking retrieved the annotated pages more
+> effectively. Reproduce it with
+> `uv run python eval/evaluate.py --ingest --chunker both`.
+
+This result does **not** show that section-aware chunking is generally worse.
+It shows that this regex-based implementation did not beat the baseline on the
+current three-paper benchmark.
+
+### What likely affected the result
+
+The current evidence suggests several contributing factors rather than one
+proven cause:
+
+- The heading regex produces false positives on reference entries and table-like
+  lines, including year-prefixed citations and training-set labels.
+- Section-aware splitting produced 245 chunks versus 231 for the baseline, and
+  35 chunks under 500 characters versus 14. Short fragments carry less context
+  and compete for the same fixed top-K retrieval slots.
+- Page-level scoring assigns each chunk one starting page. Relevant neighboring
+  or cross-page evidence can therefore be missed by the metric.
+- The benchmark contains only three papers and 30 questions, so the result should
+  not be generalized to all academic documents.
+
+Treating an unsuccessful hypothesis as an engineering result is intentional:
+the benchmark exposed weaknesses in the first implementation and provides a
+clear basis for the next iteration.
 
 ---
 
@@ -168,14 +217,14 @@ Both chunking strategies are implemented (`naive_chunk` vs `section_aware_chunk`
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | **PDF Extraction** | PyMuPDF (`fitz`) | Fast, handles complex layouts, no external dependencies |
-| **Text Splitting** | Custom regex + LangChain `RecursiveCharacterTextSplitter` | Section-aware splitting as primary, character-based as fallback |
+| **Text Splitting** | Custom regex + LangChain `RecursiveCharacterTextSplitter` | Experimental section-aware strategy plus a measured baseline |
 | **Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` | Runs on CPU, no API key, 384-dimensional — good trade-off between quality and speed |
 | **Vector Store** | ChromaDB (persistent, local) | Zero-config, embedded database with metadata filtering |
 | **LLM** | LangChain chat models (Ollama by default) | One `provider:model` setting supports local or hosted inference |
 | **Orchestration** | LangChain (LCEL) | Composable chains for QA and comparison prompts |
 | **Query Routing** | Keyword matching | Deterministic, fast, free — saves LLM tokens for actual answers |
 | **UI** | Gradio Blocks | Simple Python demo with uploads, chat, sources, and temporary share links |
-| **Evaluation** | Langfuse datasets, experiments, and scores | Offline comparison plus trace-level diagnostics |
+| **Evaluation** | Local deterministic benchmark | Reproducible retrieval and citation metrics without API keys or LLM grading |
 | **Testing** | pytest + pytest-mock | 49 tests covering loading, chunking, routing, retrieval, and chains |
 
 ---
@@ -247,8 +296,6 @@ Optional model settings:
 |---|---|
 | `PAPER_QA_MODEL` | Application model in `provider:model` format |
 | `PAPER_QA_MODEL_BASE_URL` | Custom Ollama or OpenAI-compatible endpoint |
-| `PAPER_QA_JUDGE_MODEL` | Separate evaluation judge; defaults to the application model |
-| `PAPER_QA_JUDGE_BASE_URL` | Optional custom endpoint for the judge |
 
 Upload a PDF, click **Process and ingest**, then ask a question. Select one paper for Q&A, two for comparison, or no papers for automatic routing.
 
@@ -256,40 +303,66 @@ Upload a PDF, click **Process and ingest**, then ask a question. Select one pape
 
 ## Evaluation
 
-The project includes a **30-question benchmark** covering three question types. The benchmark runner is available, but no result table is committed yet; treat the quantitative comparison as future work until it has been run with configured Langfuse credentials.
+The project includes a **30-question benchmark** covering three question types.
+The runner executes locally using the embedding retriever; it requires no
+Langfuse credentials, answer-generation model, or LLM judge.
 
 | Type | Count | Example |
 |------|-------|---------|
-| **Factual** | 10 | _"Who proposed the 'fitness-first' theory of perception?"_ |
-| **Reasoning** | 10 | _"How does Beau Lotto's Color Context Illusion challenge objective reality?"_ |
-| **Comparison** | 10 | _"Compare digital electronics to analog electronics based on signal processing."_ |
+| **Factual** | 10 | _"Which generator model does the RAG paper use?"_ |
+| **Reasoning** | 10 | _"Why are in-batch negatives efficient for training DPR?"_ |
+| **Comparison** | 10 | _"Compare the passage collections used by DPR and RAG."_ |
 
 ### Run the evaluation
 
 ```bash
-# First configure LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY.
-# Sync benchmark data only:
-uv run python eval/evaluate.py --sync-only
+# Optional metric-arithmetic smoke test (does not load papers or embeddings):
+uv run python eval/evaluate.py --smoke-test
 
-# Compare naive and section-aware chunking:
+# Complete benchmark comparison:
 uv run python eval/evaluate.py --ingest --chunker both
-
-# Run only deterministic retrieval/citation metrics:
-uv run python eval/evaluate.py --ingest --chunker both --no-llm-judge
 ```
 
-Results, traces, evaluator reasoning, and run comparisons are stored in the Langfuse dataset.
+With `--ingest --chunker both`, the runner clears and rebuilds the local Chroma
+index for each strategy, evaluates all 30 questions, computes macro averages, and
+prints a Markdown comparison table. Gold source-page annotations are used only
+for scoring, not as retrieval input.
+
+The latest committed run produced:
+
+| Metric | Naive | Section-aware | Δ |
+|---|---:|---:|---:|
+| Source-page Hit@K | 0.700 | 0.633 | -0.067 |
+| Source-page Recall@K | 0.517 | 0.456 | -0.061 |
+| Source-page Precision@K | 0.219 | 0.193 | -0.026 |
+| Source-page F1@K | 0.298 | 0.260 | -0.038 |
+| Source-paper Recall | 1.000 | 1.000 | +0.000 |
+| Citation Presence | 1.000 | 1.000 | +0.000 |
+| Citation Validity | 1.000 | 1.000 | +0.000 |
+
+See [`eval/results.md`](eval/results.md) for reproduction details and interpretation.
 
 ### Evaluation Metrics
 
 | Metric | What It Measures |
 |--------|-----------------|
-| **Source Page Hit/Recall@K** | Did retrieval find the benchmark's annotated paper pages? |
-| **Context Relevance** | How much of the retrieved context helps answer the question? |
-| **Faithfulness** | Does the answer stay grounded in the retrieved context (no hallucination)? |
-| **Answer Relevance** | Does the answer actually address what was asked? |
-| **Answer Correctness** | Does the answer agree with the benchmark ground truth? |
-| **Citation Presence/Validity** | Are page citations present and backed by retrieved pages? |
+| **Source Page Hit@K** | Did retrieval find at least one annotated paper/page pair? |
+| **Source Page Precision/Recall/F1@K** | How much retrieved evidence is annotated and how much annotated evidence was found? |
+| **Source Paper Recall** | Whether all required papers were represented in retrieved evidence, especially for comparisons |
+| **Citation Presence/Validity** | Can retrieved page metadata be emitted as citations backed by retrieved pages? |
+
+Deterministic metrics use a 0–1 scale per item. Use source-page recall as the
+primary retrieval metric, precision/F1 to detect noisy retrieval, and source-paper
+recall to catch incomplete comparisons. Boolean metrics are also averaged as 0/1
+run-level scores. These metrics isolate the chunking/retrieval experiment: recall
+rewards coverage of annotated evidence, precision penalizes extra unannotated
+paper/page pairs, and F1 balances both. Citation validity is a provenance pipeline
+check, not a measure of answer correctness or chunk relevance. Semantic answer
+grading is intentionally out of scope because LLM-as-a-judge is disabled.
+
+The benchmark measures retrieval and citation provenance, not generated-answer
+correctness. Source-page annotations may also be incomplete: a useful neighboring
+page is counted as irrelevant when it is not part of the gold annotation.
 
 ---
 
@@ -318,7 +391,7 @@ paper-qa-agent/
 │
 ├── src/                        # Core pipeline logic
 │   ├── loader.py               # PDF → structured pages (PyMuPDF)
-│   ├── chunker.py              # Pages → section-aware chunks (key differentiator)
+│   ├── chunker.py              # Naive and section-aware chunking strategies
 │   ├── vectorstore.py          # Chunks ↔ ChromaDB (store, retrieve, filter, delete)
 │   ├── chains.py               # LangChain LCEL chains for QA + comparison
 │   ├── prompts.py              # All prompt templates (QA + comparison)
@@ -334,7 +407,8 @@ paper-qa-agent/
 │
 ├── eval/                       # Evaluation framework
 │   ├── benchmark.json          # 30 curated Q&A pairs (factual/reasoning/comparison)
-│   └── evaluate.py             # Langfuse dataset/experiment runner
+│   ├── evaluate.py             # Local deterministic benchmark runner
+│   └── results.md              # Latest measured chunker comparison
 │
 ├── tests/                      # Test suite (49 tests)
 │   ├── conftest.py             # Shared fixtures (papers_dir, sample_pdf)
@@ -371,16 +445,22 @@ The LLM tokens are reserved for where they add the most value: generating the ac
 
 ### Why both chunking strategies?
 
-Building both `naive_chunk()` and `section_aware_chunk()` enables a controlled experiment: same dataset, pipeline, prompts, and LLM—only the chunker changes. Separate Langfuse runs provide the apples-to-apples comparison.
+Building both `naive_chunk()` and `section_aware_chunk()` enables a controlled
+experiment: same PDFs, questions, embedding model, router, retrieval limits, and
+metrics—only the chunker changes. The baseline winning is itself useful: it
+demonstrates why retrieval changes should be measured instead of assumed to help.
 
 ---
 
 ## Future Work
 
-- [ ] Run the benchmark and commit measured results comparing naive and section-aware chunking.
-- [ ] Report retrieval precision/recall, faithfulness, answer relevance, and citation validity.
+- [x] Run the benchmark and commit deterministic retrieval/citation results comparing both chunkers.
+- [ ] Tighten heading detection to reject references, table rows, and other false positives.
+- [ ] Add a minimum chunk length and merge undersized adjacent section fragments.
+- [ ] Compare strategies at a fixed retrieved-token budget in addition to fixed top-K.
+- [ ] Store page spans rather than only each chunk's starting page.
+- [ ] Expand the benchmark beyond three papers and report per-question error analysis.
 - [ ] Add a short demo video or deploy a public demo.
-
 - [ ] **Agentic RAG** — wrap the retriever as a tool the LLM chooses to call (inspired by [HuggingFace Agents Course](https://huggingface.co/learn/agents-course/unit3/agentic-rag/introduction))
 - [ ] **Conversation memory** — allow follow-up questions across turns
 - [ ] **Hybrid search** — combine BM25 (keyword) with embedding-based retrieval
