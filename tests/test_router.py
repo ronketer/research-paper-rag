@@ -2,7 +2,10 @@
 
 import pytest
 
-from src.router import _extract_mentioned_papers, classify_query
+from paper_qa.routing.router import (
+    _extract_mentioned_papers,
+    classify_query,
+)
 
 # ---------------------------------------------------------------------------
 # Tests for _extract_mentioned_papers

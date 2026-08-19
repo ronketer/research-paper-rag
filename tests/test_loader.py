@@ -1,7 +1,12 @@
 """Tests for src/loader.py"""
 
 import pytest
-from src.loader import load_pdf, load_multiple_pdfs, Page
+
+from paper_qa.ingestion.loader import (
+    load_multiple_pdfs,
+    load_pdf,
+)
+from paper_qa.ingestion.models import Page
 
 # ---------------------------------------------------------------------------
 # load_pdf — basic behavior

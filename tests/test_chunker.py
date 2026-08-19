@@ -1,13 +1,14 @@
 """Tests for src/chunker.py"""
 
 import pytest
-from src.loader import Page
-from src.chunker import (
+
+from paper_qa.ingestion.chunker import (
     Chunk,
     detect_section_boundaries,
     naive_chunk,
     section_aware_chunk,
 )
+from paper_qa.ingestion.models import Page
 
 # ---------------------------------------------------------------------------
 # Helpers — fake pages so tests don't depend on a real PDF

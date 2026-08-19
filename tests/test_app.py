@@ -28,7 +28,7 @@ def test_ingest_pdf_delegates_to_application_service(mocker):
     )
 
     mocker.patch(
-        "app.list_papers",
+        "app.list_ingested_papers",
         return_value=["Demo Paper"],
     )
 
@@ -49,7 +49,7 @@ def test_ingest_pdf_delegates_to_application_service(mocker):
 
 def test_answer_query_delegates_to_run_query_and_updates_history(mocker):
     mocker.patch(
-        "app.list_papers",
+        "app.list_ingested_papers",
         return_value=["Paper A"],
     )
 
@@ -118,7 +118,7 @@ def test_format_sources_omits_unknown_or_empty_sections():
 
 def test_answer_query_delegates_two_selected_papers_and_formats_empty_sources(mocker):
     mocker.patch(
-        "app.list_papers",
+        "app.list_ingested_papers",
         return_value=["Paper A", "Paper B"],
     )
 

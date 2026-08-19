@@ -3,7 +3,7 @@
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda
 
-from src.chains import (
+from paper_qa.generation.service import (
     _format_context_with_metadata,
     answer_question,
     compare_papers,
@@ -14,7 +14,8 @@ from src.chains import (
 def test_get_llm_initialization(mocker):
     """Ensure the configured chat model is initialized."""
     mock_create_chat_model = mocker.patch(
-        "src.chains.create_chat_model"
+        "paper_qa.generation.service.create_chat_model"
+
     )
 
     get_llm()
@@ -72,7 +73,7 @@ def test_answer_question_uses_retrieved_context_and_formats_output(
     ]
 
     mock_retrieve = mocker.patch(
-        "src.chains.retrieve_for_question",
+        "paper_qa.generation.service.retrieve_for_question",
         return_value=docs,
     )
 
@@ -82,7 +83,8 @@ def test_answer_question_uses_retrieved_context_and_formats_output(
     )
 
     mocker.patch(
-        "src.chains.build_qa_chain",
+        "paper_qa.generation.service.build_qa_chain"
+,
         return_value=mock_chain,
     )
 
@@ -139,7 +141,7 @@ def test_answer_question_supports_all_papers(
     ]
 
     mock_retrieve = mocker.patch(
-        "src.chains.retrieve_for_question",
+        "paper_qa.generation.service.retrieve_for_question",
         return_value=docs,
     )
 
@@ -147,7 +149,7 @@ def test_answer_question_supports_all_papers(
     mock_chain.invoke.return_value = "Answer"
 
     mocker.patch(
-        "src.chains.build_qa_chain",
+        "paper_qa.generation.service.build_qa_chain",
         return_value=mock_chain,
     )
 
@@ -189,7 +191,8 @@ def test_compare_papers_uses_retrieved_evidence_and_generates_comparison(
     ]
 
     mock_retrieve = mocker.patch(
-        "src.chains.retrieve_for_comparison",
+        "paper_qa.generation.service.retrieve_for_comparison"
+,
         return_value=(docs_a, docs_b),
     )
 
@@ -201,7 +204,7 @@ def test_compare_papers_uses_retrieved_evidence_and_generates_comparison(
     )
 
     mocker.patch(
-        "src.chains.get_llm",
+        "paper_qa.generation.service.get_llm",
         return_value=mock_llm_runnable,
     )
 

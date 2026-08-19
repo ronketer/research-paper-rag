@@ -1,8 +1,8 @@
-"""Tests for src/retrieval.py."""
+"""Tests for the retrieval policy layer."""
 
 from langchain_core.documents import Document
 
-from src.retrieval import (
+from paper_qa.retrieval.service import (
     COMPARISON_RETRIEVAL_K,
     QUESTION_RETRIEVAL_K,
     retrieve_for_comparison,
@@ -12,11 +12,13 @@ from src.retrieval import (
 
 def test_retrieve_for_question_uses_question_policy(mocker):
     mock_retrieve = mocker.patch(
-        "src.retrieval.retrieve",
+        "paper_qa.retrieval.service.retrieve",
         return_value=[
             Document(
                 page_content="Relevant text.",
-                metadata={"paper_title": "Paper A"},
+                metadata={
+                    "paper_title": "Paper A",
+                },
             )
         ],
     )
@@ -38,7 +40,7 @@ def test_retrieve_for_question_uses_question_policy(mocker):
 
 def test_retrieve_for_question_supports_all_papers(mocker):
     mock_retrieve = mocker.patch(
-        "src.retrieval.retrieve",
+        "paper_qa.retrieval.service.retrieve",
         return_value=[],
     )
 
@@ -58,18 +60,23 @@ def test_retrieve_for_comparison_queries_each_paper(mocker):
     docs_a = [
         Document(
             page_content="Paper A evidence.",
-            metadata={"paper_title": "Paper A"},
+            metadata={
+                "paper_title": "Paper A",
+            },
         )
     ]
+
     docs_b = [
         Document(
             page_content="Paper B evidence.",
-            metadata={"paper_title": "Paper B"},
+            metadata={
+                "paper_title": "Paper B",
+            },
         )
     ]
 
     mock_retrieve = mocker.patch(
-        "src.retrieval.retrieve"
+        "paper_qa.retrieval.service.retrieve"
     )
 
     mock_retrieve.side_effect = [

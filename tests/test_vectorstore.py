@@ -3,13 +3,13 @@
 import pytest
 from langchain_core.documents import Document
 
-from src.chunker import Chunk
-from src.vectorstore import (
+from paper_qa.infrastructure.vectorstore import (
     add_paper,
     delete_paper,
     list_papers,
     retrieve,
 )
+from paper_qa.ingestion.models import Chunk
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,7 +35,7 @@ def _make_chunks(paper_title: str, count: int = 3) -> list[Chunk]:
 def test_add_paper_creates_correct_documents(mocker):
     """add_paper should convert Chunks to LangChain Documents with exact metadata."""
     mock_db = mocker.Mock()
-    mocker.patch("src.vectorstore.get_vectorstore", return_value=mock_db)
+    mocker.patch("paper_qa.infrastructure.vectorstore.get_vectorstore", return_value=mock_db)
 
     chunks = _make_chunks("Test Paper 1", count=2)
     add_paper("Test Paper 1", chunks)
@@ -60,7 +60,7 @@ def test_add_paper_creates_correct_documents(mocker):
 def test_retrieve_no_filter(mocker):
     """If no paper_filter is provided, it should search globally."""
     mock_db = mocker.Mock()
-    mocker.patch("src.vectorstore.get_vectorstore", return_value=mock_db)
+    mocker.patch("paper_qa.infrastructure.vectorstore.get_vectorstore", return_value=mock_db)
 
     retrieve("What is attention?", k=5)
 
@@ -70,7 +70,7 @@ def test_retrieve_no_filter(mocker):
 def test_retrieve_single_string_filter(mocker):
     """If paper_filter is a string, it should pass a single exact-match filter."""
     mock_db = mocker.Mock()
-    mocker.patch("src.vectorstore.get_vectorstore", return_value=mock_db)
+    mocker.patch("paper_qa.infrastructure.vectorstore.get_vectorstore", return_value=mock_db)
 
     retrieve("What is attention?", paper_filter="Attention Is All You Need", k=4)
 
@@ -87,7 +87,7 @@ def test_retrieve_list_filter_distributes_k(mocker):
     mock_db = mocker.Mock()
     mock_doc = Document(page_content="test result")
     mock_db.similarity_search.return_value = [mock_doc, mock_doc]
-    mocker.patch("src.vectorstore.get_vectorstore", return_value=mock_db)
+    mocker.patch("paper_qa.infrastructure.vectorstore.get_vectorstore", return_value=mock_db)
 
     results = retrieve("Compare results", paper_filter=["Paper A", "Paper B"], k=5)
 
@@ -116,7 +116,7 @@ def test_list_papers_returns_unique_sorted_titles(mocker):
             {}
         ]
     }
-    mocker.patch("src.vectorstore.get_vectorstore", return_value=mock_db)
+    mocker.patch("paper_qa.infrastructure.vectorstore.get_vectorstore", return_value=mock_db)
 
     titles = list_papers()
 
@@ -127,7 +127,7 @@ def test_list_papers_returns_unique_sorted_titles(mocker):
 def test_delete_paper(mocker):
     """delete_paper should trigger the Chroma delete method with the correct where clause."""
     mock_db = mocker.Mock()
-    mocker.patch("src.vectorstore.get_vectorstore", return_value=mock_db)
+    mocker.patch("paper_qa.infrastructure.vectorstore.get_vectorstore", return_value=mock_db)
 
     delete_paper("Bad Paper")
 

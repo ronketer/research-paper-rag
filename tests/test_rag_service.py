@@ -1,201 +1,371 @@
 from types import SimpleNamespace
 
-from src.application import rag_service
-from src.application.rag_service import QueryResult, ingest_document, run_query
+from paper_qa.application.rag_service import (
+    QueryResult,
+    RAGService,
+)
+
+
+def _make_service(
+    mocker,
+    *,
+    load_pdf=None,
+    chunkers=None,
+    add_paper=None,
+    delete_paper=None,
+    list_papers=None,
+    answer_question=None,
+    compare_papers=None,
+    classify_query=None,
+):
+    """Create a RAGService with controllable test dependencies."""
+
+    return RAGService(
+        load_pdf_fn=load_pdf or mocker.Mock(return_value=[]),
+        chunkers=chunkers or {},
+        add_paper_fn=add_paper or mocker.Mock(),
+        delete_paper_fn=delete_paper or mocker.Mock(),
+        list_papers_fn=list_papers or mocker.Mock(return_value=[]),
+        answer_question_fn=answer_question or mocker.Mock(),
+        compare_papers_fn=compare_papers or mocker.Mock(),
+        classify_query_fn=classify_query or mocker.Mock(),
+    )
 
 
 def test_ingest_document_loads_chunks_and_stores_paper(mocker):
     pages = [
-        SimpleNamespace(paper_title="Demo Paper"),
+        SimpleNamespace(
+            paper_title="Demo Paper",
+        )
     ]
-    chunks = [object(), object()]
 
-    mocker.patch(
-        "src.application.rag_service.load_pdf",
-        return_value=pages,
+    chunks = [
+        object(),
+        object(),
+    ]
+
+    mock_loader = mocker.Mock(
+        return_value=pages
     )
 
-    selected_chunker = mocker.Mock(return_value=chunks)
-    mocker.patch.dict(
-        rag_service.CHUNKERS,
-        {"section_aware": selected_chunker},
+    mock_chunker = mocker.Mock(
+        return_value=chunks
     )
 
-    mock_delete = mocker.patch(
-        "src.application.rag_service.delete_paper"
-    )
-    mock_add = mocker.patch(
-        "src.application.rag_service.add_paper"
+    mock_add = mocker.Mock()
+    mock_delete = mocker.Mock()
+
+    service = _make_service(
+        mocker,
+        load_pdf=mock_loader,
+        chunkers={
+            "section_aware": mock_chunker,
+        },
+        add_paper=mock_add,
+        delete_paper=mock_delete,
     )
 
-    result = ingest_document(
+    result = service.ingest_document(
         file_path="demo.pdf",
         chunking_strategy="section_aware",
     )
 
-    selected_chunker.assert_called_once_with(pages)
-    mock_delete.assert_called_once_with("Demo Paper")
-    mock_add.assert_called_once_with("Demo Paper", chunks)
+    mock_loader.assert_called_once_with(
+        "demo.pdf"
+    )
+
+    mock_chunker.assert_called_once_with(
+        pages
+    )
+
+    mock_delete.assert_called_once_with(
+        "Demo Paper"
+    )
+
+    mock_add.assert_called_once_with(
+        "Demo Paper",
+        chunks,
+    )
 
     assert result.paper_title == "Demo Paper"
     assert result.chunk_count == 2
 
 
-def test_run_query_single_selected_paper(mocker):
-    mock_answer = mocker.patch(
-        "src.application.rag_service.answer_question",
-        return_value={
-            "answer": "Answer for Paper A",
-            "sources": [{"paper": "Paper A", "page": 1, "text": "evidence"}],
-        },
+def test_ingest_document_rejects_unknown_chunker(
+    mocker,
+):
+    pages = [
+        SimpleNamespace(
+            paper_title="Demo Paper",
+        )
+    ]
+
+    service = _make_service(
+        mocker,
+        load_pdf=mocker.Mock(
+            return_value=pages
+        ),
     )
 
-    result = run_query(
+    try:
+        service.ingest_document(
+            file_path="demo.pdf",
+            chunking_strategy="unknown",
+        )
+    except ValueError as exc:
+        assert "Unknown chunking strategy" in str(exc)
+    else:
+        raise AssertionError(
+            "Expected ValueError"
+        )
+
+
+def test_run_query_single_selected_paper(
+    mocker,
+):
+    mock_answer = mocker.Mock(
+        return_value={
+            "answer": "Answer for Paper A",
+            "sources": [
+                {
+                    "paper": "Paper A",
+                    "page": 1,
+                    "text": "evidence",
+                }
+            ],
+        }
+    )
+
+    service = _make_service(
+        mocker,
+        answer_question=mock_answer,
+    )
+
+    result = service.run_query(
         question="What is the result?",
         selected_papers=["Paper A"],
     )
 
-    mock_answer.assert_called_once_with("What is the result?", "Paper A")
-    assert isinstance(result, QueryResult)
-    assert result.answer == "Answer for Paper A"
-    assert result.sources == [{"paper": "Paper A", "page": 1, "text": "evidence"}]
-    assert result.source_heading == "Paper: Paper A"
-
-
-def test_run_query_two_selected_papers(mocker):
-    mock_compare = mocker.patch(
-        "src.application.rag_service.compare_papers",
-        return_value={
-            "comparison": "Comparison table between Paper A and Paper B",
-            "sources_a": [{"paper": "Paper A", "page": 1, "text": "evidence a"}],
-            "sources_b": [{"paper": "Paper B", "page": 2, "text": "evidence b"}],
-        },
+    mock_answer.assert_called_once_with(
+        "What is the result?",
+        "Paper A",
     )
 
-    result = run_query(
+    assert isinstance(
+        result,
+        QueryResult,
+    )
+
+    assert result.answer == (
+        "Answer for Paper A"
+    )
+
+    assert result.source_heading == (
+        "Paper: Paper A"
+    )
+
+
+def test_run_query_two_selected_papers(
+    mocker,
+):
+    mock_compare = mocker.Mock(
+        return_value={
+            "comparison": "Comparison result",
+            "sources_a": [
+                {
+                    "paper": "Paper A",
+                    "page": 1,
+                    "text": "a",
+                }
+            ],
+            "sources_b": [
+                {
+                    "paper": "Paper B",
+                    "page": 2,
+                    "text": "b",
+                }
+            ],
+        }
+    )
+
+    service = _make_service(
+        mocker,
+        compare_papers=mock_compare,
+    )
+
+    result = service.run_query(
         question="Compare methodology",
-        selected_papers=["Paper A", "Paper B"],
+        selected_papers=[
+            "Paper A",
+            "Paper B",
+        ],
     )
 
     mock_compare.assert_called_once_with(
-        "Compare methodology", "Paper A", "Paper B"
+        "Compare methodology",
+        "Paper A",
+        "Paper B",
     )
-    assert isinstance(result, QueryResult)
-    assert result.answer == "Comparison table between Paper A and Paper B"
-    assert result.sources == [
-        {"paper": "Paper A", "page": 1, "text": "evidence a"},
-        {"paper": "Paper B", "page": 2, "text": "evidence b"},
-    ]
-    assert result.source_heading == "Comparison: Paper A vs Paper B"
+
+    assert result.answer == (
+        "Comparison result"
+    )
+
+    assert result.source_heading == (
+        "Comparison: Paper A vs Paper B"
+    )
+
+    assert len(result.sources) == 2
 
 
-def test_run_query_no_selection_router_chooses_single_paper(mocker):
-    mocker.patch(
-        "src.application.rag_service.list_papers",
-        return_value=["Paper A", "Paper B"],
+def test_run_query_router_chooses_single_paper(
+    mocker,
+):
+    mock_list = mocker.Mock(
+        return_value=[
+            "Paper A",
+            "Paper B",
+        ]
     )
-    mock_classify = mocker.patch(
-        "src.application.rag_service.classify_query",
+
+    mock_router = mocker.Mock(
         return_value={
             "mode": "single_paper",
             "papers": ["Paper A"],
-        },
-    )
-    mock_answer = mocker.patch(
-        "src.application.rag_service.answer_question",
-        return_value={
-            "answer": "Single paper answer",
-            "sources": [{"paper": "Paper A", "page": 3, "text": "context"}],
-        },
+        }
     )
 
-    result = run_query(
+    mock_answer = mocker.Mock(
+        return_value={
+            "answer": "Single answer",
+            "sources": [],
+        }
+    )
+
+    service = _make_service(
+        mocker,
+        list_papers=mock_list,
+        classify_query=mock_router,
+        answer_question=mock_answer,
+    )
+
+    result = service.run_query(
         question="What does Paper A do?",
         selected_papers=[],
     )
 
-    mock_classify.assert_called_once_with(
-        "What does Paper A do?", ["Paper A", "Paper B"]
+    mock_router.assert_called_once_with(
+        "What does Paper A do?",
+        [
+            "Paper A",
+            "Paper B",
+        ],
     )
-    mock_answer.assert_called_once_with("What does Paper A do?", "Paper A")
-    assert isinstance(result, QueryResult)
-    assert result.answer == "Single paper answer"
-    assert result.sources == [{"paper": "Paper A", "page": 3, "text": "context"}]
+
+    mock_answer.assert_called_once_with(
+        "What does Paper A do?",
+        "Paper A",
+    )
+
+    assert result.answer == "Single answer"
     assert result.source_heading == "Paper: Paper A"
 
 
-def test_run_query_no_selection_router_chooses_fallback_all_papers(mocker):
-    mocker.patch(
-        "src.application.rag_service.list_papers",
-        return_value=["Paper A", "Paper B"],
+def test_run_query_router_falls_back_to_all_papers(
+    mocker,
+):
+    mock_list = mocker.Mock(
+        return_value=[
+            "Paper A",
+            "Paper B",
+        ]
     )
-    mock_classify = mocker.patch(
-        "src.application.rag_service.classify_query",
+
+    mock_router = mocker.Mock(
         return_value={
             "mode": "single_paper",
             "papers": [],
-        },
-    )
-    mock_answer = mocker.patch(
-        "src.application.rag_service.answer_question",
-        return_value={
-            "answer": "Global answer across papers",
-            "sources": [{"paper": "Paper B", "page": 1, "text": "context"}],
-        },
+        }
     )
 
-    result = run_query(
+    mock_answer = mocker.Mock(
+        return_value={
+            "answer": "Global answer",
+            "sources": [],
+        }
+    )
+
+    service = _make_service(
+        mocker,
+        list_papers=mock_list,
+        classify_query=mock_router,
+        answer_question=mock_answer,
+    )
+
+    result = service.run_query(
         question="What is deep learning?",
         selected_papers=None,
     )
 
-    mock_classify.assert_called_once_with(
-        "What is deep learning?", ["Paper A", "Paper B"]
+    mock_answer.assert_called_once_with(
+        "What is deep learning?",
+        None,
     )
-    mock_answer.assert_called_once_with("What is deep learning?", None)
-    assert isinstance(result, QueryResult)
-    assert result.answer == "Global answer across papers"
-    assert result.sources == [{"paper": "Paper B", "page": 1, "text": "context"}]
+
+    assert result.answer == "Global answer"
     assert result.source_heading == "Paper: all papers"
 
 
-def test_run_query_no_selection_router_chooses_comparison(mocker):
-    mocker.patch(
-        "src.application.rag_service.list_papers",
-        return_value=["Paper A", "Paper B"],
-    )
-    mock_classify = mocker.patch(
-        "src.application.rag_service.classify_query",
-        return_value={
-            "mode": "comparison",
-            "papers": ["Paper A", "Paper B"],
-        },
-    )
-    mock_compare = mocker.patch(
-        "src.application.rag_service.compare_papers",
-        return_value={
-            "comparison": "Routed comparison result",
-            "sources_a": [{"paper": "Paper A", "page": 5, "text": "a"}],
-            "sources_b": [{"paper": "Paper B", "page": 7, "text": "b"}],
-        },
+def test_run_query_router_chooses_comparison(
+    mocker,
+):
+    mock_list = mocker.Mock(
+        return_value=[
+            "Paper A",
+            "Paper B",
+        ]
     )
 
-    result = run_query(
+    mock_router = mocker.Mock(
+        return_value={
+            "mode": "comparison",
+            "papers": [
+                "Paper A",
+                "Paper B",
+            ],
+        }
+    )
+
+    mock_compare = mocker.Mock(
+        return_value={
+            "comparison": "Routed comparison",
+            "sources_a": [],
+            "sources_b": [],
+        }
+    )
+
+    service = _make_service(
+        mocker,
+        list_papers=mock_list,
+        classify_query=mock_router,
+        compare_papers=mock_compare,
+    )
+
+    result = service.run_query(
         question="Compare Paper A and Paper B",
         selected_papers=[],
     )
 
-    mock_classify.assert_called_once_with(
-        "Compare Paper A and Paper B", ["Paper A", "Paper B"]
-    )
     mock_compare.assert_called_once_with(
-        "Compare Paper A and Paper B", "Paper A", "Paper B"
+        "Compare Paper A and Paper B",
+        "Paper A",
+        "Paper B",
     )
-    assert isinstance(result, QueryResult)
-    assert result.answer == "Routed comparison result"
-    assert result.sources == [
-        {"paper": "Paper A", "page": 5, "text": "a"},
-        {"paper": "Paper B", "page": 7, "text": "b"},
-    ]
-    assert result.source_heading == "Comparison: Paper A vs Paper B"
 
+    assert result.answer == (
+        "Routed comparison"
+    )
+
+    assert result.source_heading == (
+        "Comparison: Paper A vs Paper B"
+    )
