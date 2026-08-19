@@ -8,10 +8,8 @@ from typing import Any
 
 import gradio as gr
 
-from src.application.rag_service import ingest_document
-from src.chains import answer_question, compare_papers
+from src.application.rag_service import ingest_document, run_query
 from src.model_config import get_app_model_name
-from src.router import classify_query
 from src.vectorstore import delete_paper, list_papers
 
 # Gradio's Chatbot uses a list of dictionaries in this shape.
@@ -211,37 +209,13 @@ def answer_query(
         return "", history, "_No sources available._"
 
     try:
-        # Explicit UI selection takes priority over automatic query routing.
-        if len(selected_papers) == 2:
-            paper_a, paper_b = selected_papers
-            result = compare_papers(question, paper_a, paper_b)
-            answer = result["comparison"]
-            sources = result["sources_a"] + result["sources_b"]
-            source_heading = f"Comparison: {paper_a} vs {paper_b}"
-        elif len(selected_papers) == 1:
-            paper = selected_papers[0]
-            result = answer_question(question, paper)
-            answer = result["answer"]
-            sources = result["sources"]
-            source_heading = f"Paper: {paper}"
-        else:
-            # With no manual selection, preserve the project's existing router.
-            route = classify_query(question, available_papers)
-            if route["mode"] == "comparison" and len(route["papers"]) >= 2:
-                paper_a, paper_b = route["papers"][:2]
-                result = compare_papers(question, paper_a, paper_b)
-                answer = result["comparison"]
-                sources = result["sources_a"] + result["sources_b"]
-                source_heading = f"Comparison: {paper_a} vs {paper_b}"
-            else:
-                paper = route["papers"][0] if route["papers"] else None
-                result = answer_question(question, paper)
-                answer = result["answer"]
-                sources = result["sources"]
-                source_heading = f"Paper: {paper or 'all papers'}"
+        result = run_query(
+            question=question,
+            selected_papers=selected_papers,
+        )
 
-        history.append({"role": "assistant", "content": answer})
-        return "", history, _format_sources(sources, source_heading)
+        history.append({"role": "assistant", "content": result.answer})
+        return "", history, _format_sources(result.sources, result.source_heading)
     except Exception as exc:
         configured_model = get_app_model_name()
         if configured_model.startswith("ollama:"):

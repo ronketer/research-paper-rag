@@ -47,17 +47,17 @@ def test_ingest_pdf_delegates_to_application_service(mocker):
     assert "Demo Paper" in inventory
 
 
-def test_answer_query_uses_selected_single_paper(mocker):
+def test_answer_query_delegates_to_run_query_and_updates_history(mocker):
     mocker.patch(
         "app.list_papers",
         return_value=["Paper A"],
     )
 
-    mock_answer = mocker.patch(
-        "app.answer_question",
-        return_value={
-            "answer": "A cited answer [p. 2].",
-            "sources": [
+    mock_run = mocker.patch(
+        "app.run_query",
+        return_value=SimpleNamespace(
+            answer="A cited answer [p. 2].",
+            sources=[
                 {
                     "paper": "Paper A",
                     "page": 2,
@@ -65,7 +65,8 @@ def test_answer_query_uses_selected_single_paper(mocker):
                     "text": "Evidence",
                 }
             ],
-        },
+            source_heading="Paper: Paper A",
+        ),
     )
 
     cleared, history, sources = app.answer_query(
@@ -74,14 +75,15 @@ def test_answer_query_uses_selected_single_paper(mocker):
         ["Paper A"],
     )
 
-    mock_answer.assert_called_once_with(
-        "What method was used?",
-        "Paper A",
+    mock_run.assert_called_once_with(
+        question="What method was used?",
+        selected_papers=["Paper A"],
     )
 
     assert cleared == ""
     assert history[-1]["content"] == "A cited answer [p. 2]."
     assert "Paper A — page 2 — Methods" in sources
+    assert "### Paper: Paper A" in sources
 
 
 def test_format_sources_omits_unknown_or_empty_sections():
@@ -114,19 +116,19 @@ def test_format_sources_omits_unknown_or_empty_sections():
     assert "— Unknown" not in formatted
 
 
-def test_answer_query_uses_two_selected_papers_for_comparison(mocker):
+def test_answer_query_delegates_two_selected_papers_and_formats_empty_sources(mocker):
     mocker.patch(
         "app.list_papers",
         return_value=["Paper A", "Paper B"],
     )
 
-    mock_compare = mocker.patch(
-        "app.compare_papers",
-        return_value={
-            "comparison": "| Aspect | Paper A | Paper B |",
-            "sources_a": [],
-            "sources_b": [],
-        },
+    mock_run = mocker.patch(
+        "app.run_query",
+        return_value=SimpleNamespace(
+            answer="| Aspect | Paper A | Paper B |",
+            sources=[],
+            source_heading="Comparison: Paper A vs Paper B",
+        ),
     )
 
     _, history, sources = app.answer_query(
@@ -135,10 +137,9 @@ def test_answer_query_uses_two_selected_papers_for_comparison(mocker):
         ["Paper A", "Paper B"],
     )
 
-    mock_compare.assert_called_once_with(
-        "Compare the methods.",
-        "Paper A",
-        "Paper B",
+    mock_run.assert_called_once_with(
+        question="Compare the methods.",
+        selected_papers=["Paper A", "Paper B"],
     )
 
     assert history[-1]["content"] == "| Aspect | Paper A | Paper B |"
