@@ -1,8 +1,14 @@
+"""LLM generation chains for paper Q&A and comparison."""
+
+from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 
 from src.model_config import create_chat_model
 from src.prompts import COMPARISON_PROMPT, QA_PROMPT
-from src.vectorstore import retrieve
+from src.retrieval import (
+    retrieve_for_comparison,
+    retrieve_for_question,
+)
 
 
 def get_llm():
@@ -18,9 +24,10 @@ def build_qa_chain():
     return QA_PROMPT.pipe(llm).pipe(output_parser)
 
 
-def _format_context_with_metadata(docs: list) -> str:
+def _format_context_with_metadata(
+    docs: list[Document],
+) -> str:
     """Format retrieved chunks with page and section metadata."""
-
     formatted_chunks = []
 
     for doc in docs:
@@ -43,35 +50,17 @@ def _format_context_with_metadata(docs: list) -> str:
     return "\n\n".join(formatted_chunks)
 
 
-def answer_question(
-    question: str,
-    paper_title: str | None,
-) -> dict:
-    """Answer a question using one paper or all indexed papers."""
-
-    docs = retrieve(
-        query=question,
-        paper_filter=paper_title,
-        k=4,
-    )
-
-    context_text = _format_context_with_metadata(docs)
-
-    chain = build_qa_chain()
-
-    answer = chain.invoke(
-        {
-            "context": context_text,
-            "question": question,
-        }
-    )
-
-    sources = [
+def _format_sources(
+    docs: list[Document],
+    fallback_paper_title: str | None,
+) -> list[dict]:
+    """Convert retrieved documents into source records for the UI."""
+    return [
         {
             "text": doc.page_content,
             "paper": doc.metadata.get(
                 "paper_title",
-                paper_title or "Unknown",
+                fallback_paper_title or "Unknown",
             ),
             "page": doc.metadata.get(
                 "page_number",
@@ -85,9 +74,34 @@ def answer_question(
         for doc in docs
     ]
 
+
+def answer_question(
+    question: str,
+    paper_title: str | None,
+) -> dict:
+    """Generate an answer from retrieved paper evidence."""
+    docs = retrieve_for_question(
+        question=question,
+        paper_title=paper_title,
+    )
+
+    context_text = _format_context_with_metadata(docs)
+
+    chain = build_qa_chain()
+
+    answer = chain.invoke(
+        {
+            "context": context_text,
+            "question": question,
+        }
+    )
+
     return {
         "answer": answer,
-        "sources": sources,
+        "sources": _format_sources(
+            docs,
+            paper_title,
+        ),
     }
 
 
@@ -96,18 +110,11 @@ def compare_papers(
     paper_a: str,
     paper_b: str,
 ) -> dict:
-    """Compare two papers on a topic."""
-
-    docs_a = retrieve(
-        query=question,
-        paper_filter=paper_a,
-        k=3,
-    )
-
-    docs_b = retrieve(
-        query=question,
-        paper_filter=paper_b,
-        k=3,
+    """Generate a comparison between two papers."""
+    docs_a, docs_b = retrieve_for_comparison(
+        question=question,
+        paper_a=paper_a,
+        paper_b=paper_b,
     )
 
     context_a_text = _format_context_with_metadata(
@@ -136,36 +143,13 @@ def compare_papers(
         }
     )
 
-    def format_sources(
-        docs: list,
-        paper_title: str,
-    ) -> list:
-        return [
-            {
-                "text": doc.page_content,
-                "paper": doc.metadata.get(
-                    "paper_title",
-                    paper_title,
-                ),
-                "page": doc.metadata.get(
-                    "page_number",
-                    "Unknown",
-                ),
-                "section": doc.metadata.get(
-                    "section",
-                    "Unknown",
-                ),
-            }
-            for doc in docs
-        ]
-
     return {
         "comparison": comparison_table,
-        "sources_a": format_sources(
+        "sources_a": _format_sources(
             docs_a,
             paper_a,
         ),
-        "sources_b": format_sources(
+        "sources_b": _format_sources(
             docs_b,
             paper_b,
         ),

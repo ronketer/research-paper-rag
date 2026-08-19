@@ -1,6 +1,5 @@
-"""Tests for src/chains.py (using pytest-mock)"""
+"""Tests for src/chains.py."""
 
-import pytest
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda
 
@@ -11,106 +10,236 @@ from src.chains import (
     get_llm,
 )
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 def test_get_llm_initialization(mocker):
-    """Ensure the LLM is initialized with the correct model and temperature."""
-    mock_create_chat_model = mocker.patch("src.chains.create_chat_model")
+    """Ensure the configured chat model is initialized."""
+    mock_create_chat_model = mocker.patch(
+        "src.chains.create_chat_model"
+    )
+
     get_llm()
 
     mock_create_chat_model.assert_called_once_with()
 
 
 def test_format_context_with_metadata():
-    """Ensure context chunks are formatted cleanly with page and section info."""
+    """Context should contain page and section metadata."""
     docs = [
         Document(
             page_content="First chunk text.",
-            metadata={"page_number": 1, "section": "Introduction"}
+            metadata={
+                "page_number": 1,
+                "section": "Introduction",
+            },
         ),
         Document(
             page_content="Second chunk text.",
-            metadata={}
-        )
+            metadata={},
+        ),
     ]
 
-    formatted_text = _format_context_with_metadata(docs)
+    formatted_text = _format_context_with_metadata(
+        docs
+    )
 
-    assert "[Page 1 | Section: Introduction]" in formatted_text
+    assert (
+        "[Page 1 | Section: Introduction]"
+        in formatted_text
+    )
     assert "First chunk text." in formatted_text
 
-    assert "[Page Unknown | Section: Unknown]" in formatted_text
+    assert (
+        "[Page Unknown | Section: Unknown]"
+        in formatted_text
+    )
     assert "Second chunk text." in formatted_text
     assert "\n\n" in formatted_text
 
 
-def test_answer_question_formats_output_correctly(mocker):
-    """Test that a single-paper QA query fetches docs, triggers the chain, and builds the source list."""
-
-    # Mock Retriever
-    mock_retrieve = mocker.patch("src.chains.retrieve")
-    mock_retrieve.return_value = [
-        Document(page_content="Relevant text.", metadata={"page_number": 5, "section": "2. Methods"})
+def test_answer_question_uses_retrieved_context_and_formats_output(
+    mocker,
+):
+    """Q&A should consume retrieval results and generate an answer."""
+    docs = [
+        Document(
+            page_content="Relevant text.",
+            metadata={
+                "paper_title": "Test Paper",
+                "page_number": 5,
+                "section": "2. Methods",
+            },
+        )
     ]
 
-    # Mock Chain
-    mock_chain = mocker.Mock()
-    mock_chain.invoke.return_value = "This is a mocked LLM answer."
-    mocker.patch("src.chains.build_qa_chain", return_value=mock_chain)
-
-    # Execute
-    result = answer_question("What method was used?", "Test Paper")
-
-    # Assertions
-    mock_retrieve.assert_called_once_with(
-        query="What method was used?",
-        paper_filter="Test Paper",
-        k=4
+    mock_retrieve = mocker.patch(
+        "src.chains.retrieve_for_question",
+        return_value=docs,
     )
 
-    assert result["answer"] == "This is a mocked LLM answer."
-    assert len(result["sources"]) == 1
-    assert result["sources"][0] == {
-        "text": "Relevant text.",
-        "paper": "Test Paper",
-        "page": 5,
-        "section": "2. Methods"
-    }
+    mock_chain = mocker.Mock()
+    mock_chain.invoke.return_value = (
+        "This is a mocked LLM answer."
+    )
+
+    mocker.patch(
+        "src.chains.build_qa_chain",
+        return_value=mock_chain,
+    )
+
+    result = answer_question(
+        "What method was used?",
+        "Test Paper",
+    )
+
+    mock_retrieve.assert_called_once_with(
+        question="What method was used?",
+        paper_title="Test Paper",
+    )
+
+    mock_chain.invoke.assert_called_once()
+
+    invocation = mock_chain.invoke.call_args.args[0]
+
+    assert invocation["question"] == (
+        "What method was used?"
+    )
+    assert "Relevant text." in invocation["context"]
+    assert (
+        "[Page 5 | Section: 2. Methods]"
+        in invocation["context"]
+    )
+
+    assert result["answer"] == (
+        "This is a mocked LLM answer."
+    )
+
+    assert result["sources"] == [
+        {
+            "text": "Relevant text.",
+            "paper": "Test Paper",
+            "page": 5,
+            "section": "2. Methods",
+        }
+    ]
 
 
-def test_compare_papers_structures_multi_document_comparison(mocker):
-    """Test that comparison retrieves for two distinct papers and runs the LCEL prompt."""
+def test_answer_question_supports_all_papers(
+    mocker,
+):
+    """None should represent an unfiltered all-paper question."""
+    docs = [
+        Document(
+            page_content="Global evidence.",
+            metadata={
+                "paper_title": "Paper A",
+                "page_number": 2,
+                "section": "Results",
+            },
+        )
+    ]
 
-    # Mock Retriever
-    mock_retrieve = mocker.patch("src.chains.retrieve")
-    def fake_retrieve(query, paper_filter, k):
-        if paper_filter == "Paper A":
-            return [Document(page_content="A content.", metadata={"page_number": 10})]
-        if paper_filter == "Paper B":
-            return [Document(page_content="B content.", metadata={"page_number": 12})]
-        return []
-    mock_retrieve.side_effect = fake_retrieve
+    mock_retrieve = mocker.patch(
+        "src.chains.retrieve_for_question",
+        return_value=docs,
+    )
 
-    # Mock LLM component in the pipeline
-    mock_llm_runnable = RunnableLambda(lambda x: "| Aspect | Paper A | Paper B |\n|---|---|---|")
-    mocker.patch("src.chains.get_llm", return_value=mock_llm_runnable)
+    mock_chain = mocker.Mock()
+    mock_chain.invoke.return_value = "Answer"
 
-    # Execute
-    result = compare_papers("Compare methodology", "Paper A", "Paper B")
+    mocker.patch(
+        "src.chains.build_qa_chain",
+        return_value=mock_chain,
+    )
 
-    # Assertions
-    assert mock_retrieve.call_count == 2
-    mock_retrieve.assert_any_call(query="Compare methodology", paper_filter="Paper A", k=3)
-    mock_retrieve.assert_any_call(query="Compare methodology", paper_filter="Paper B", k=3)
+    result = answer_question(
+        "What do the papers conclude?",
+        None,
+    )
 
-    assert result["comparison"] == "| Aspect | Paper A | Paper B |\n|---|---|---|"
+    mock_retrieve.assert_called_once_with(
+        question="What do the papers conclude?",
+        paper_title=None,
+    )
+
+    assert result["sources"][0]["paper"] == "Paper A"
+
+
+def test_compare_papers_uses_retrieved_evidence_and_generates_comparison(
+    mocker,
+):
+    """Comparison should consume evidence for both papers."""
+    docs_a = [
+        Document(
+            page_content="A content.",
+            metadata={
+                "paper_title": "Paper A",
+                "page_number": 10,
+            },
+        )
+    ]
+
+    docs_b = [
+        Document(
+            page_content="B content.",
+            metadata={
+                "paper_title": "Paper B",
+                "page_number": 12,
+            },
+        )
+    ]
+
+    mock_retrieve = mocker.patch(
+        "src.chains.retrieve_for_comparison",
+        return_value=(docs_a, docs_b),
+    )
+
+    mock_llm_runnable = RunnableLambda(
+        lambda _: (
+            "| Aspect | Paper A | Paper B |\n"
+            "|---|---|---|"
+        )
+    )
+
+    mocker.patch(
+        "src.chains.get_llm",
+        return_value=mock_llm_runnable,
+    )
+
+    result = compare_papers(
+        "Compare methodology",
+        "Paper A",
+        "Paper B",
+    )
+
+    mock_retrieve.assert_called_once_with(
+        question="Compare methodology",
+        paper_a="Paper A",
+        paper_b="Paper B",
+    )
+
+    assert result["comparison"] == (
+        "| Aspect | Paper A | Paper B |\n"
+        "|---|---|---|"
+    )
 
     assert len(result["sources_a"]) == 1
-    assert result["sources_a"][0]["text"] == "A content."
+    assert (
+        result["sources_a"][0]["text"]
+        == "A content."
+    )
     assert result["sources_a"][0]["page"] == 10
+    assert (
+        result["sources_a"][0]["paper"]
+        == "Paper A"
+    )
 
     assert len(result["sources_b"]) == 1
-    assert result["sources_b"][0]["text"] == "B content."
+    assert (
+        result["sources_b"][0]["text"]
+        == "B content."
+    )
     assert result["sources_b"][0]["page"] == 12
+    assert (
+        result["sources_b"][0]["paper"]
+        == "Paper B"
+    )
