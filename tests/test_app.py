@@ -6,7 +6,10 @@ import app
 
 
 def test_runtime_status_shows_provider_without_machine_specific_model(mocker):
-    mocker.patch("app.get_app_model_name", return_value="ollama:qwen3-4b-local")
+    mocker.patch(
+        "app.get_app_model_name",
+        return_value="ollama:qwen3-4b-local",
+    )
 
     status = app.runtime_status(app.NAIVE_CHUNKING)
 
@@ -15,34 +18,41 @@ def test_runtime_status_shows_provider_without_machine_specific_model(mocker):
     assert app.NAIVE_CHUNKING in status
 
 
-def test_ingest_pdf_uses_selected_chunker(mocker):
-    pages = [SimpleNamespace(paper_title="Demo Paper")]
-    chunks = [object(), object()]
-    selected_chunker = mocker.Mock(return_value=chunks)
-    mocker.patch.dict(
-        app.CHUNKING_STRATEGIES,
-        {app.SECTION_AWARE_CHUNKING: selected_chunker},
+def test_ingest_pdf_delegates_to_application_service(mocker):
+    mock_ingest = mocker.patch(
+        "app.ingest_document",
+        return_value=SimpleNamespace(
+            paper_title="Demo Paper",
+            chunk_count=2,
+        ),
     )
-    mocker.patch("app.load_pdf", return_value=pages)
-    mock_delete = mocker.patch("app.delete_paper")
-    mock_add = mocker.patch("app.add_paper")
-    mocker.patch("app.list_papers", return_value=["Demo Paper"])
+
+    mocker.patch(
+        "app.list_papers",
+        return_value=["Demo Paper"],
+    )
 
     status, _, inventory = app.ingest_pdf(
         "demo.pdf",
         app.SECTION_AWARE_CHUNKING,
     )
 
-    selected_chunker.assert_called_once_with(pages)
-    mock_delete.assert_called_once_with("Demo Paper")
-    mock_add.assert_called_once_with("Demo Paper", chunks)
+    mock_ingest.assert_called_once_with(
+        file_path="demo.pdf",
+        chunking_strategy="section_aware",
+    )
+
     assert app.SECTION_AWARE_CHUNKING in status
     assert "2 chunks" in status
     assert "Demo Paper" in inventory
 
 
 def test_answer_query_uses_selected_single_paper(mocker):
-    mocker.patch("app.list_papers", return_value=["Paper A"])
+    mocker.patch(
+        "app.list_papers",
+        return_value=["Paper A"],
+    )
+
     mock_answer = mocker.patch(
         "app.answer_question",
         return_value={
@@ -64,7 +74,11 @@ def test_answer_query_uses_selected_single_paper(mocker):
         ["Paper A"],
     )
 
-    mock_answer.assert_called_once_with("What method was used?", "Paper A")
+    mock_answer.assert_called_once_with(
+        "What method was used?",
+        "Paper A",
+    )
+
     assert cleared == ""
     assert history[-1]["content"] == "A cited answer [p. 2]."
     assert "Paper A — page 2 — Methods" in sources
@@ -72,9 +86,24 @@ def test_answer_query_uses_selected_single_paper(mocker):
 
 def test_format_sources_omits_unknown_or_empty_sections():
     sources = [
-        {"paper": "Paper A", "page": 1, "section": "Unknown", "text": "A"},
-        {"paper": "Paper B", "page": 2, "section": None, "text": "B"},
-        {"paper": "Paper C", "page": 3, "section": "", "text": "C"},
+        {
+            "paper": "Paper A",
+            "page": 1,
+            "section": "Unknown",
+            "text": "A",
+        },
+        {
+            "paper": "Paper B",
+            "page": 2,
+            "section": None,
+            "text": "B",
+        },
+        {
+            "paper": "Paper C",
+            "page": 3,
+            "section": "",
+            "text": "C",
+        },
     ]
 
     formatted = app._format_sources(sources)
@@ -86,7 +115,11 @@ def test_format_sources_omits_unknown_or_empty_sections():
 
 
 def test_answer_query_uses_two_selected_papers_for_comparison(mocker):
-    mocker.patch("app.list_papers", return_value=["Paper A", "Paper B"])
+    mocker.patch(
+        "app.list_papers",
+        return_value=["Paper A", "Paper B"],
+    )
+
     mock_compare = mocker.patch(
         "app.compare_papers",
         return_value={
@@ -107,5 +140,6 @@ def test_answer_query_uses_two_selected_papers_for_comparison(mocker):
         "Paper A",
         "Paper B",
     )
+
     assert history[-1]["content"] == "| Aspect | Paper A | Paper B |"
     assert sources == "_No sources were returned._"

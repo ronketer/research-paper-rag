@@ -8,13 +8,11 @@ from typing import Any
 
 import gradio as gr
 
+from src.application.rag_service import ingest_document
 from src.chains import answer_question, compare_papers
-from src.chunker import naive_chunk, section_aware_chunk
-from src.loader import load_pdf
 from src.model_config import get_app_model_name
 from src.router import classify_query
-from src.vectorstore import add_paper, delete_paper, list_papers
-
+from src.vectorstore import delete_paper, list_papers
 
 # Gradio's Chatbot uses a list of dictionaries in this shape.
 ChatHistory = list[dict[str, Any]]
@@ -23,19 +21,21 @@ NAIVE_CHUNKING = "Naive — benchmark winner"
 SECTION_AWARE_CHUNKING = "Section-aware — experimental"
 DEFAULT_CHUNKING_STRATEGY = NAIVE_CHUNKING
 CHUNKING_STRATEGIES = {
-    NAIVE_CHUNKING: naive_chunk,
-    SECTION_AWARE_CHUNKING: section_aware_chunk,
+    NAIVE_CHUNKING: "naive",
+    SECTION_AWARE_CHUNKING: "section_aware",
 }
 
 
 def runtime_status(chunking_strategy: str) -> str:
     """Describe the model and ingestion strategy currently selected in the UI."""
     model_name = get_app_model_name()
+
     provider_name = (
         model_name.split(":", maxsplit=1)[0].replace("-", " ").title()
         if ":" in model_name
         else "Custom"
     )
+
     return (
         f"**Answer provider:** {provider_name} (configured in `.env`)  \n"
         f"**Ingestion chunker:** {chunking_strategy}"
@@ -45,7 +45,8 @@ def runtime_status(chunking_strategy: str) -> str:
 def _paper_inventory(papers: list[str]) -> str:
     """Turn the stored paper names into a short Markdown list."""
     if not papers:
-        return "_No papers have been ingested yet._"
+        return "_No papers have been ingested yet."
+
     return "\n".join(f"- {paper}" for paper in papers)
 
 
@@ -54,7 +55,12 @@ def _dropdown_update(
     selected: list[str] | None = None,
 ) -> gr.Dropdown:
     """Return a new Dropdown configuration for Gradio to apply in the UI."""
-    selected = [paper for paper in (selected or []) if paper in papers]
+    selected = [
+        paper
+        for paper in (selected or [])
+        if paper in papers
+    ]
+
     return gr.Dropdown(
         choices=papers,
         value=selected,
@@ -66,46 +72,68 @@ def _dropdown_update(
 def refresh_papers() -> tuple[gr.Dropdown, str]:
     """Refresh the paper selector when the demo first opens."""
     papers = list_papers()
-    return _dropdown_update(papers), _paper_inventory(papers)
+
+    return (
+        _dropdown_update(papers),
+        _paper_inventory(papers),
+    )
 
 
 def ingest_pdf(
     file_path: str | None,
     chunking_strategy: str = DEFAULT_CHUNKING_STRATEGY,
 ) -> tuple[str, gr.Dropdown, str]:
-    """Extract, chunk, and store one PDF selected in the Gradio uploader."""
+    """Ingest one PDF selected in the Gradio uploader."""
+
     if not file_path:
         papers = list_papers()
-        return "Please choose a PDF first.", _dropdown_update(papers), _paper_inventory(papers)
+
+        return (
+            "Please choose a PDF first.",
+            _dropdown_update(papers),
+            _paper_inventory(papers),
+        )
 
     try:
-        # Gradio gives us a temporary filepath, which PyMuPDF can read directly.
-        pages = load_pdf(file_path)
-        if not pages:
-            raise ValueError("No text could be extracted from this PDF.")
+        strategy = CHUNKING_STRATEGIES.get(chunking_strategy)
 
-        chunker = CHUNKING_STRATEGIES.get(chunking_strategy)
-        if chunker is None:
-            raise ValueError(f"Unknown chunking strategy: {chunking_strategy}")
+        if strategy is None:
+            raise ValueError(
+                f"Unknown chunking strategy: {chunking_strategy}"
+            )
 
-        title = pages[0].paper_title
-        chunks = chunker(pages)
-
-        # Replace an older copy instead of adding duplicate chunks.
-        delete_paper(title)
-        add_paper(title, chunks)
+        result = ingest_document(
+            file_path=file_path,
+            chunking_strategy=strategy,
+        )
 
         papers = list_papers()
+
         status = (
-            f"✅ Ingested **{title}** using **{chunking_strategy}** "
-            f"({len(chunks)} chunks)."
+            f"✅ Ingested **{result.paper_title}** "
+            f"using **{chunking_strategy}** "
+            f"({result.chunk_count} chunks)."
         )
-        return status, _dropdown_update(papers, [title]), _paper_inventory(papers)
+
+        return (
+            status,
+            _dropdown_update(
+                papers,
+                [result.paper_title],
+            ),
+            _paper_inventory(papers),
+        )
+
     except Exception as exc:
         papers = list_papers()
-        status = f"❌ Ingestion failed: {exc}"
-        return status, _dropdown_update(papers), _paper_inventory(papers)
 
+        status = f"❌ Ingestion failed: {exc}"
+
+        return (
+            status,
+            _dropdown_update(papers),
+            _paper_inventory(papers),
+        )
 
 def remove_selected_papers(
     selected_papers: list[str] | None,
