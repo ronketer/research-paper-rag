@@ -1,3 +1,7 @@
+"""Provider-agnostic chat-model configuration."""
+
+from __future__ import annotations
+
 import os
 from typing import Any
 
@@ -13,7 +17,7 @@ load_dotenv(ENV_FILE)
 
 
 def get_app_model_name() -> str:
-    """Return the provider-prefixed configured chat model."""
+    """Return the provider-prefixed model used for generation."""
 
     return os.getenv(
         "PAPER_QA_MODEL",
@@ -36,7 +40,9 @@ def create_chat_model(
 
     resolved_base_url = (
         base_url
-        or os.getenv("PAPER_QA_MODEL_BASE_URL")
+        or os.getenv(
+            "PAPER_QA_MODEL_BASE_URL"
+        )
     )
 
     options: dict[str, Any] = {
